@@ -1,4 +1,4 @@
-# AI Agent Template
+# Strands Agents AI Agent Template
 
 **A production-ready template for building AI agents with AWS Strands Agents.**
 
