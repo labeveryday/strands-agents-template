@@ -3,9 +3,10 @@ strands-agents
 strands-agents-tools
 strands-agents[anthropic]
 strands-agents[openai]
+strands-agents[writer]
+strands-agents[ollama]
 python-dotenv
-bedrock-agentcore
-bedrock-agentcore-starter-toolkit
+
 
 
 # Optional - uncomment as needed
