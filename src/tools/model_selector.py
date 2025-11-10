@@ -9,101 +9,273 @@ from strands import tool
 
 
 # Model registry with capabilities and costs
+# Synced with models.py - all available models for Strands agents
 MODELS = {
-    "claude-sonnet-4-20250514": {
+    # ========== ANTHROPIC MODELS ==========
+    "claude-haiku-4-5-20251001": {
+        "provider": "anthropic",
+        "name": "Claude Haiku 4.5",
+        "capabilities": ["chat", "reasoning", "code", "analysis"],
+        "context_window": 200000,
+        "max_output_tokens": 64000,
+        "cost_input": 1.00,
+        "cost_output": 5.00,
+        "speed": "fast",
+        "quality": "high",
+        "use_cases": ["fast responses", "cost-effective reasoning", "general tasks"]
+    },
+    "claude-sonnet-4-5-20250929": {
         "provider": "anthropic",
         "name": "Claude Sonnet 4.5",
         "capabilities": ["chat", "reasoning", "code", "analysis", "long-context"],
-        "context_window": 200000,
-        "cost_input": 3.00,  # per 1M tokens
+        "context_window": 200000,  # 1M in beta
+        "max_output_tokens": 64000,
+        "cost_input": 3.00,
         "cost_output": 15.00,
         "speed": "medium",
         "quality": "highest",
         "use_cases": ["complex reasoning", "code generation", "deep analysis", "creative writing"]
     },
-    "claude-3-5-sonnet-20241022": {
+    "claude-sonnet-4-20250514": {
         "provider": "anthropic",
-        "name": "Claude 3.5 Sonnet",
+        "name": "Claude Sonnet 4",
+        "capabilities": ["chat", "reasoning", "code", "analysis", "long-context"],
+        "context_window": 200000,  # 1M in beta
+        "max_output_tokens": 64000,
+        "cost_input": 3.00,
+        "cost_output": 15.00,
+        "speed": "medium",
+        "quality": "highest",
+        "use_cases": ["complex reasoning", "code generation", "deep analysis"]
+    },
+    "claude-3-7-sonnet-20250219": {
+        "provider": "anthropic",
+        "name": "Claude 3.7 Sonnet",
         "capabilities": ["chat", "reasoning", "code", "analysis"],
         "context_window": 200000,
+        "max_output_tokens": 64000,
         "cost_input": 3.00,
         "cost_output": 15.00,
         "speed": "medium",
         "quality": "high",
         "use_cases": ["general tasks", "coding", "analysis"]
     },
-    "claude-3-haiku-20240307": {
+    "claude-3-5-haiku-20241022": {
         "provider": "anthropic",
-        "name": "Claude 3 Haiku",
-        "capabilities": ["chat", "simple-tasks"],
+        "name": "Claude 3.5 Haiku",
+        "capabilities": ["chat", "code", "simple-tasks"],
         "context_window": 200000,
-        "cost_input": 0.25,
-        "cost_output": 1.25,
+        "max_output_tokens": 8000,
+        "cost_input": 0.80,
+        "cost_output": 4.00,
         "speed": "fast",
         "quality": "good",
-        "use_cases": ["simple tasks", "classification", "quick responses"]
+        "use_cases": ["simple tasks", "quick responses", "cost-effective operations"]
     },
-    "gpt-4o": {
+
+    # ========== OPENAI MODELS ==========
+    "gpt-5-2025-08-07": {
+        "provider": "openai",
+        "name": "GPT-5",
+        "capabilities": ["chat", "reasoning", "code", "analysis", "long-context"],
+        "context_window": 400000,
+        "max_output_tokens": 128000,
+        "cost_input": 1.25,
+        "cost_output": 10.00,
+        "speed": "medium",
+        "quality": "highest",
+        "use_cases": ["complex reasoning", "code generation", "long documents", "analysis"]
+    },
+    "gpt-4.1-2025-04-14": {
+        "provider": "openai",
+        "name": "GPT-4.1",
+        "capabilities": ["chat", "code", "analysis", "long-context"],
+        "context_window": 1000000,
+        "max_output_tokens": 32000,
+        "cost_input": 2.00,
+        "cost_output": 8.00,
+        "speed": "medium",
+        "quality": "high",
+        "use_cases": ["very long documents", "large codebases", "extensive context"]
+    },
+    "o4-mini-2025-04-16": {
+        "provider": "openai",
+        "name": "O4 Mini",
+        "capabilities": ["reasoning", "math", "code", "science"],
+        "context_window": 200000,
+        "max_output_tokens": 100000,
+        "cost_input": 1.10,
+        "cost_output": 4.40,
+        "speed": "medium",
+        "quality": "high",
+        "use_cases": ["reasoning tasks", "math problems", "scientific analysis"]
+    },
+    "gpt-5-mini-2025-08-07": {
+        "provider": "openai",
+        "name": "GPT-5 Mini",
+        "capabilities": ["chat", "reasoning", "code", "analysis"],
+        "context_window": 400000,
+        "max_output_tokens": 128000,
+        "cost_input": 0.25,
+        "cost_output": 2.00,
+        "speed": "fast",
+        "quality": "high",
+        "use_cases": ["cost-effective reasoning", "general tasks", "high volume"]
+    },
+    "gpt-5-nano-2025-08-07": {
+        "provider": "openai",
+        "name": "GPT-5 Nano",
+        "capabilities": ["chat", "reasoning", "simple-tasks"],
+        "context_window": 400000,
+        "max_output_tokens": 128000,
+        "cost_input": 0.05,
+        "cost_output": 0.40,
+        "speed": "fast",
+        "quality": "good",
+        "use_cases": ["ultra-low-cost tasks", "high volume operations", "simple queries"]
+    },
+    "gpt-4o-2024-11-20": {
         "provider": "openai",
         "name": "GPT-4o",
-        "capabilities": ["chat", "vision", "reasoning", "code", "multimodal"],
+        "capabilities": ["chat", "vision", "code", "multimodal"],
         "context_window": 128000,
+        "max_output_tokens": 16000,
+        "cost_input": 2.50,
+        "cost_output": 1.25,
+        "speed": "medium",
+        "quality": "high",
+        "use_cases": ["multimodal tasks", "vision", "image analysis"]
+    },
+    "gpt-5-pro-2025-10-06": {
+        "provider": "openai",
+        "name": "GPT-5 Pro",
+        "capabilities": ["chat", "reasoning", "code", "analysis", "long-context"],
+        "context_window": 400000,
+        "max_output_tokens": 272000,
+        "cost_input": 1.25,
+        "cost_output": 120.00,
+        "speed": "slow",
+        "quality": "highest",
+        "use_cases": ["highest quality output", "critical tasks", "extensive responses"]
+    },
+    "o4-mini-deep-research-2025-06-26": {
+        "provider": "openai",
+        "name": "O4 Mini Deep Research",
+        "capabilities": ["reasoning", "research", "analysis", "science", "math"],
+        "context_window": 200000,
+        "max_output_tokens": 100000,
+        "cost_input": 2.00,
+        "cost_output": 8.00,
+        "speed": "slow",
+        "quality": "highest",
+        "use_cases": ["deep research", "scientific analysis", "complex problem solving"]
+    },
+
+    # ========== WRITER MODELS ==========
+    "palmyra-x5": {
+        "provider": "writer",
+        "name": "Palmyra X5",
+        "capabilities": ["chat", "code", "analysis", "long-context"],
+        "context_window": 1000000,
+        "max_output_tokens": 32000,
+        "cost_input": 0.60,
+        "cost_output": 6.00,
+        "speed": "medium",
+        "quality": "high",
+        "use_cases": ["cost-effective long context", "large documents", "general tasks"]
+    },
+    "palmyra-x4": {
+        "provider": "writer",
+        "name": "Palmyra X4",
+        "capabilities": ["chat", "code", "analysis"],
+        "context_window": 128000,
+        "max_output_tokens": 32000,
         "cost_input": 2.50,
         "cost_output": 10.00,
         "speed": "medium",
         "quality": "high",
-        "use_cases": ["multimodal tasks", "vision", "general reasoning"]
+        "use_cases": ["general tasks", "coding", "analysis"]
     },
-    "gpt-4o-mini": {
-        "provider": "openai",
-        "name": "GPT-4o Mini",
-        "capabilities": ["chat", "vision", "code", "multimodal"],
+    "palmyra-fin": {
+        "provider": "writer",
+        "name": "Palmyra Finance",
+        "capabilities": ["chat", "finance", "analysis"],
         "context_window": 128000,
-        "cost_input": 0.15,
-        "cost_output": 0.60,
-        "speed": "fast",
-        "quality": "good",
-        "use_cases": ["cheap tasks", "quick responses", "simple vision"]
-    },
-    "gpt-4-turbo": {
-        "provider": "openai",
-        "name": "GPT-4 Turbo",
-        "capabilities": ["chat", "vision", "code", "reasoning"],
-        "context_window": 128000,
-        "cost_input": 10.00,
-        "cost_output": 30.00,
-        "speed": "medium",
-        "quality": "high",
-        "use_cases": ["complex tasks", "high quality output"]
-    },
-    "o1": {
-        "provider": "openai",
-        "name": "O1",
-        "capabilities": ["reasoning", "math", "science", "code"],
-        "context_window": 128000,
-        "cost_input": 15.00,
-        "cost_output": 60.00,
-        "speed": "slow",
-        "quality": "highest",
-        "use_cases": ["complex reasoning", "math", "science", "research"]
-    },
-    "o1-mini": {
-        "provider": "openai",
-        "name": "O1 Mini",
-        "capabilities": ["reasoning", "math", "code"],
-        "context_window": 128000,
-        "cost_input": 3.00,
+        "max_output_tokens": 32000,
+        "cost_input": 5.00,
         "cost_output": 12.00,
         "speed": "medium",
         "quality": "high",
-        "use_cases": ["reasoning", "cheaper than o1"]
+        "use_cases": ["financial analysis", "market research", "business intelligence"]
+    },
+    "palmyra-med": {
+        "provider": "writer",
+        "name": "Palmyra Medical",
+        "capabilities": ["chat", "medical", "analysis"],
+        "context_window": 32000,
+        "max_output_tokens": 8000,
+        "cost_input": 5.00,
+        "cost_output": 12.00,
+        "speed": "medium",
+        "quality": "high",
+        "use_cases": ["medical analysis", "healthcare", "clinical documentation"]
+    },
+    "palmyra-creative": {
+        "provider": "writer",
+        "name": "Palmyra Creative",
+        "capabilities": ["chat", "creative-writing", "content-generation"],
+        "context_window": 128000,
+        "max_output_tokens": 32000,
+        "cost_input": 5.00,
+        "cost_output": 12.00,
+        "speed": "medium",
+        "quality": "high",
+        "use_cases": ["creative writing", "content creation", "marketing copy"]
+    },
+
+    # ========== OLLAMA MODELS (Local) ==========
+    "qwen3:4b": {
+        "provider": "ollama",
+        "name": "Qwen 3 4B",
+        "capabilities": ["chat", "code", "reasoning", "local"],
+        "context_window": 260000,
+        "max_output_tokens": 128000,
+        "cost_input": 0.00,
+        "cost_output": 0.00,
+        "speed": "fast",
+        "quality": "good",
+        "use_cases": ["local deployment", "privacy", "no API costs", "offline usage"]
+    },
+    "llama3.1:latest": {
+        "provider": "ollama",
+        "name": "Llama 3.1",
+        "capabilities": ["chat", "code", "reasoning", "local"],
+        "context_window": 131000,
+        "max_output_tokens": 128000,
+        "cost_input": 0.00,
+        "cost_output": 0.00,
+        "speed": "medium",
+        "quality": "good",
+        "use_cases": ["local deployment", "privacy", "no API costs", "offline usage"]
+    },
+    "gemma3n:e4b": {
+        "provider": "ollama",
+        "name": "Gemma 3N 4B",
+        "capabilities": ["chat", "simple-tasks", "local"],
+        "context_window": 32000,
+        "max_output_tokens": 8000,
+        "cost_input": 0.00,
+        "cost_output": 0.00,
+        "speed": "fast",
+        "quality": "good",
+        "use_cases": ["local deployment", "simple chat", "no tool support"]
     },
 }
 
 
 @tool
 def get_available_models(
-    provider: Optional[Literal["anthropic", "openai"]] = None,
+    provider: Optional[Literal["anthropic", "openai", "writer", "ollama"]] = None,
     capability: Optional[str] = None,
     max_cost_input: Optional[float] = None,
     min_quality: Optional[Literal["good", "high", "highest"]] = None
@@ -115,23 +287,29 @@ def get_available_models(
     requirements like cost, quality, speed, or capabilities.
 
     Args:
-        provider: Filter by provider (anthropic or openai)
-        capability: Filter by capability (chat, reasoning, code, vision, etc.)
-        max_cost_input: Maximum input cost per 1M tokens
+        provider: Filter by provider (anthropic, openai, writer, or ollama)
+        capability: Filter by capability (chat, reasoning, code, vision, local, etc.)
+        max_cost_input: Maximum input cost per 1M tokens (0 for free/local models)
         min_quality: Minimum quality level (good, high, highest)
 
     Returns:
-        JSON string with model information
+        JSON string with model information including context windows and max output tokens
 
-    Example:
-        To find a cheap model for simple tasks:
+    Examples:
+        Find cheap models for simple tasks:
         get_available_models(max_cost_input=1.0, min_quality="good")
 
-        To find models with vision capability:
+        Find models with vision capability:
         get_available_models(capability="vision")
 
-        To find best reasoning model:
+        Find best reasoning models:
         get_available_models(capability="reasoning", min_quality="highest")
+
+        Find local/free models:
+        get_available_models(provider="ollama")
+
+        Find Writer models for long context:
+        get_available_models(provider="writer", capability="long-context")
     """
     import json
 
@@ -185,62 +363,94 @@ def get_model_recommendation(
     task_lower = task_description.lower()
 
     # Analyze task requirements
-    needs_vision = any(word in task_lower for word in ["image", "vision", "picture", "visual"])
-    needs_reasoning = any(word in task_lower for word in ["complex", "reasoning", "math", "science", "research"])
-    needs_code = any(word in task_lower for word in ["code", "programming", "debug", "implement"])
-    is_simple = any(word in task_lower for word in ["simple", "quick", "basic", "classification"])
+    needs_vision = any(word in task_lower for word in ["image", "vision", "picture", "visual", "multimodal"])
+    needs_reasoning = any(word in task_lower for word in ["complex", "reasoning", "math", "science", "research", "deep"])
+    needs_code = any(word in task_lower for word in ["code", "programming", "debug", "implement", "software"])
+    needs_long_context = any(word in task_lower for word in ["long", "large", "extensive", "document", "codebase"])
+    needs_local = any(word in task_lower for word in ["local", "offline", "privacy", "private", "no-api"])
+    is_simple = any(word in task_lower for word in ["simple", "quick", "basic", "classification", "fast"])
+    is_creative = any(word in task_lower for word in ["creative", "writing", "story", "content", "marketing"])
+    is_finance = any(word in task_lower for word in ["finance", "financial", "trading", "market", "business"])
+    is_medical = any(word in task_lower for word in ["medical", "healthcare", "clinical", "health"])
 
     # Default recommendation
-    recommended = "claude-sonnet-4-20250514"
+    recommended = "claude-sonnet-4-5-20250929"
     reasoning = "Balanced model for general tasks"
 
     # Cost-optimized
     if priority == "cost":
-        if is_simple:
-            recommended = "claude-3-haiku-20240307"
-            reasoning = "Cheapest model, good for simple tasks"
+        if needs_local:
+            recommended = "qwen3:4b"
+            reasoning = "Free local model, zero API costs"
+        elif is_simple:
+            recommended = "gpt-5-nano-2025-08-07"
+            reasoning = "Ultra-low-cost model at $0.05/M input, good for simple tasks"
+        elif needs_long_context:
+            recommended = "palmyra-x5"
+            reasoning = "1M context window at only $0.60/M input - best for long documents"
         else:
-            recommended = "gpt-4o-mini"
-            reasoning = "Good balance of cost and capability"
+            recommended = "gpt-5-mini-2025-08-07"
+            reasoning = "Excellent balance of cost ($0.25/M) and capability with reasoning"
 
     # Quality-optimized
     elif priority == "quality":
         if needs_reasoning:
-            recommended = "o1"
-            reasoning = "Best reasoning model available"
+            recommended = "o4-mini-deep-research-2025-06-26"
+            reasoning = "Best deep reasoning and research model with extensive analysis capability"
         elif needs_code:
-            recommended = "claude-sonnet-4-20250514"
-            reasoning = "Excellent code generation and reasoning"
+            recommended = "claude-sonnet-4-5-20250929"
+            reasoning = "Highest quality code generation with extended thinking"
+        elif needs_long_context:
+            recommended = "gpt-4.1-2025-04-14"
+            reasoning = "1M context window for extensive documents and large codebases"
         else:
-            recommended = "claude-sonnet-4-20250514"
-            reasoning = "Highest quality general-purpose model"
+            recommended = "gpt-5-pro-2025-10-06"
+            reasoning = "Highest quality output with 272K max tokens, ideal for critical tasks"
 
     # Speed-optimized
     elif priority == "speed":
-        if needs_vision:
-            recommended = "gpt-4o-mini"
-            reasoning = "Fast multimodal model"
+        if needs_local:
+            recommended = "qwen3:4b"
+            reasoning = "Fast local model with no API latency"
+        elif needs_vision:
+            recommended = "gpt-4o-2024-11-20"
+            reasoning = "Fast multimodal model with vision capability"
         else:
-            recommended = "claude-3-haiku-20240307"
-            reasoning = "Fastest model available"
+            recommended = "claude-haiku-4-5-20251001"
+            reasoning = "Fastest reasoning-capable model with good quality"
 
     # Balanced
     else:
-        if needs_reasoning and not is_simple:
-            recommended = "o1-mini"
-            reasoning = "Good reasoning at reasonable cost"
+        if is_medical:
+            recommended = "palmyra-med"
+            reasoning = "Specialized medical model for healthcare and clinical tasks"
+        elif is_finance:
+            recommended = "palmyra-fin"
+            reasoning = "Specialized finance model for market analysis and business intelligence"
+        elif is_creative:
+            recommended = "palmyra-creative"
+            reasoning = "Specialized model for creative writing and content generation"
+        elif needs_local:
+            recommended = "qwen3:4b"
+            reasoning = "Best local model with 260k context and tool support"
+        elif needs_reasoning and not is_simple:
+            recommended = "o4-mini-2025-04-16"
+            reasoning = "Strong reasoning capability at reasonable cost"
         elif needs_vision:
-            recommended = "gpt-4o"
-            reasoning = "Best multimodal model"
+            recommended = "gpt-4o-2024-11-20"
+            reasoning = "Best multimodal model with vision capability"
         elif needs_code:
-            recommended = "claude-sonnet-4-20250514"
-            reasoning = "Excellent for code tasks"
+            recommended = "claude-sonnet-4-5-20250929"
+            reasoning = "Excellent code generation with extended thinking"
+        elif needs_long_context:
+            recommended = "palmyra-x5"
+            reasoning = "1M context window at great price point"
         elif is_simple:
-            recommended = "gpt-4o-mini"
-            reasoning = "Cheap and fast for simple tasks"
+            recommended = "gpt-5-mini-2025-08-07"
+            reasoning = "Fast and cost-effective with reasoning capability"
         else:
-            recommended = "claude-sonnet-4-20250514"
-            reasoning = "Best general-purpose model"
+            recommended = "claude-sonnet-4-5-20250929"
+            reasoning = "Best general-purpose model with extended thinking and 200k context"
 
     result = {
         "recommended_model": recommended,
@@ -250,7 +460,12 @@ def get_model_recommendation(
             "needs_vision": needs_vision,
             "needs_reasoning": needs_reasoning,
             "needs_code": needs_code,
-            "is_simple": is_simple
+            "needs_long_context": needs_long_context,
+            "needs_local": needs_local,
+            "is_simple": is_simple,
+            "is_creative": is_creative,
+            "is_finance": is_finance,
+            "is_medical": is_medical
         }
     }
 
