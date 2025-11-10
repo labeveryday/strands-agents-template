@@ -10,7 +10,6 @@ It also uses the LoggingHook to log the tool invocations.
 It also uses the pprint to pretty print the responses.
 """
 
-import os
 from pathlib import Path
 from datetime import datetime
 from strands import Agent
@@ -73,13 +72,13 @@ class LoggingHook(HookProvider):
         print(f"Agent: {event.agent.name}")
         print(f"Tool: {event.tool_use['name']}")
         print("Input Parameters:")
-        
+
         # Pretty print the input with color coding
         import json
         formatted_input = json.dumps(event.tool_use['input'], indent=2)
         for line in formatted_input.split('\n'):
             print(f"{line}")
-        
+
         print('='* 60)
 
 
@@ -165,5 +164,5 @@ with agentcore_mcp_client, strands_mcp_client:
             continue
 
         response = agent(prompt)
-            
+
         print(f"Assistant: {response}")

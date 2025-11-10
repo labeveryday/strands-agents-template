@@ -31,7 +31,7 @@ def anthropic_model(api_key: str = os.getenv("ANTHROPIC_API_KEY"),
         budget_tokens: The budget tokens to use (default: 1000)
     Returns:
         AnthropicModel
-    
+
     Available models:
     - claude-haiku-4-5-20251001 - 200k context - 64k max_output tokens - input $1/M - output $5/M - Reasoning yes
     - claude-sonnet-4-5-20250929 - 200k context (1M beta) - 64k max_output tokens - input $3/M - output $15/M - Reasoning yes
@@ -50,7 +50,7 @@ def anthropic_model(api_key: str = os.getenv("ANTHROPIC_API_KEY"),
         thinking = {
             "type": "disabled",
         }
-    
+
     return AnthropicModel(
         client_args={
             "api_key": api_key,
@@ -68,7 +68,7 @@ def anthropic_model(api_key: str = os.getenv("ANTHROPIC_API_KEY"),
 # https://platform.openai.com/docs/models
 # ============================================================================
 
-def openai_model(api_key: str = os.getenv("OPENAI_API_KEY"), 
+def openai_model(api_key: str = os.getenv("OPENAI_API_KEY"),
     model_id: str = "gpt-5-mini-2025-08-07",
     max_tokens: int = 16000,
     temperature: float = 1,
@@ -83,7 +83,7 @@ def openai_model(api_key: str = os.getenv("OPENAI_API_KEY"),
         reasoning_effort: The reasoning effort to use (default: "low")
     Returns:
         OpenAIModel
-    
+
     Available models:
     - gpt-5-2025-08-07 - 400k context - 128K max_output tokens - input $1.25/M - output $10/M - Reasoning yes
     - gpt-4.1-2025-04-14 - 1M context - 32K max_output tokens - input $2/M - output $8/M - Reasoning no
@@ -112,7 +112,7 @@ def openai_model(api_key: str = os.getenv("OPENAI_API_KEY"),
 # https://ollama.com/library
 # ============================================================================
 
-def ollama_model(host: str = os.getenv("OLLAMA_HOST"), 
+def ollama_model(host: str = os.getenv("OLLAMA_HOST"),
     model_id: str = "qwen3:4b",
     max_tokens: int = 2000,
     temperature: float = 1,
@@ -126,7 +126,7 @@ def ollama_model(host: str = os.getenv("OLLAMA_HOST"),
         temperature: The temperature to use (default: 1)
     Returns:
         OllamaModel
-    
+
     Available models:
     - qwen3:4b - 260k context - 128K max_output tokens
     - llama3.1:latest - 131k context - 128K max_output tokens
@@ -141,7 +141,7 @@ def ollama_model(host: str = os.getenv("OLLAMA_HOST"),
         max_tokens = 8000
     else:
         raise ValueError(f"Model ID {model_id} not supported")
-    
+
     if model_id == "gemma3n:e4b":
         print("NOTE: Tools are not supported with model.")
     return OllamaModel(
@@ -170,7 +170,7 @@ def writer_model(api_key: str = os.getenv("WRITER_API_KEY"),
         temperature: The temperature to use (default: 1)
     Returns:
         WriterModel
-    
+
     Available models:
     - palmyra-x5 - 1M context - 32K max_output tokens - input $0.60/M - output $6.00/M
     - palmyra-x4 - 128k context - 32k max_output tokens - input $2.50/M - output $10/M
