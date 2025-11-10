@@ -12,11 +12,14 @@ It also uses the pprint to pretty print the responses.
 
 import os
 from pathlib import Path
-import datetime
+from datetime import datetime
 from strands import Agent
 from models import anthropic_model
 from strands.session.file_session_manager import FileSessionManager
 from strands.agent.conversation_manager import SlidingWindowConversationManager
+
+from mcp import stdio_client, StdioServerParameters
+from strands.tools.mcp import MCPClient
 
 # Hooks for logging tool invocations
 from strands.hooks import HookProvider, HookRegistry
@@ -31,7 +34,7 @@ from pprint import pprint
 load_dotenv()
 
 # import model
-MODEL = anthropic_model()
+MODEL = anthropic_model(model_id="claude-sonnet-4-5-20250929")
 
 # Create a consistent session ID
 # Configure session ID based on the current date
@@ -54,8 +57,7 @@ conversation_manager = SlidingWindowConversationManager(
 )
 
 
-
-# Color-coded logging hook for tool invocations before they are executed
+# Logging hook for tool invocations before they are executed
 class LoggingHook(HookProvider):
     def __init__(self):
         self.calls = 0
@@ -81,49 +83,87 @@ class LoggingHook(HookProvider):
         print('='* 60)
 
 
-agent = Agent(
-    model=MODEL,
-    tools=[shell, current_time, editor],
-    session_manager=session_manager,
-    conversation_manager=conversation_manager,
-    hooks=[LoggingHook()],
-    callback_handler=None,
-    name="Demo Agent",
-    load_tools_from_directory=True  # Load tools from the tools directory automatically
+agentcore_mcp_client = MCPClient(lambda: stdio_client(
+    StdioServerParameters(
+        command="uvx",
+        args=["awslabs.amazon-bedrock-agentcore-mcp-server@latest"],
+        autoApprove=[
+            "search_agentcore_docs",
+            "fetch_agentcore_doc"
+        ]
     )
+))
 
-print("\nWelcome to the Demo Agent!\n")
-print("- Type 'exit' to quit.")
-print("- Type 'model' to view the model configuration.")
-print("- Type 'metrics' to view the event loop metrics.")
-print("- Type 'name' to view the agent name.")
-print("- Type 'tools' to view the agent tools.\n")
+strands_mcp_client = MCPClient(lambda: stdio_client(
+    StdioServerParameters(
+        command="uvx",
+        args=["strands-agents-mcp-server"],
+        autoApprove=[
+            "search_docs",
+            "fetch_doc"
+        ]
+    )
+))
 
-while True:
-    print("-" * 100)
-    prompt = input("> ")
-    print("-" * 100 + "\n")
 
-    if prompt == "exit" or prompt == "quit":
-        break
+SYSTEM_PROMPT = """
+You are a helpful assistant that specializes in building and optimizing AI agents:
+- You can use the AgentCore MCP server to get information about the AgentCore platform.
+- You can use the Strands MCP server to get information about the Strands platform.
+- You can use the Model selector tool to get information about the best model for a task.
+- You can use the shell tool to interact with the system.
+- You can use the editor tool to edit files.
+- You can use the current_time tool to get the current time.
+"""
 
-    if prompt == "model":
-        print(f"Model Configuration: {agent.model.config}")
-        continue
 
-    if prompt == "metrics":
-        print("Event Loop Metrics:")
-        pprint(agent.event_loop_metrics)
-        continue
+with agentcore_mcp_client, strands_mcp_client:
+    # Get the tools from the MCP server
+    tools = agentcore_mcp_client.list_tools_sync() + strands_mcp_client.list_tools_sync()
 
-    if prompt == "tools":
-        print(f"Agent Tools: {agent.tool_names}")
-        continue
+    agent = Agent(
+        model=MODEL,
+        tools=[shell, current_time, editor] + tools,
+        session_manager=session_manager,
+        conversation_manager=conversation_manager,
+        hooks=[LoggingHook()],
+        callback_handler=None,
+        name="Demo Agent",
+        load_tools_from_directory=True  # Load tools from the tools directory automatically
+        )
 
-    if prompt == "name":
-        print(f"Agent Name: {agent.name}")
-        continue
+    print("\nWelcome to the Demo Agent!\n")
+    print("- Type 'exit' to quit.")
+    print("- Type 'model' to view the model configuration.")
+    print("- Type 'metrics' to view the event loop metrics.")
+    print("- Type 'name' to view the agent name.")
+    print("- Type 'tools' to view the agent tools.\n")
 
-    response = agent(prompt)
-        
-    print(f"Assistant: {response}")
+    while True:
+        print("-" * 100)
+        prompt = input("> ")
+        print("-" * 100 + "\n")
+
+        if prompt == "exit" or prompt == "quit":
+            break
+
+        if prompt == "model":
+            print(f"Model Configuration: {agent.model.config}")
+            continue
+
+        if prompt == "metrics":
+            print("Event Loop Metrics:")
+            pprint(agent.event_loop_metrics)
+            continue
+
+        if prompt == "tools":
+            print(f"Agent Tools: {agent.tool_names}")
+            continue
+
+        if prompt == "name":
+            print(f"Agent Name: {agent.name}")
+            continue
+
+        response = agent(prompt)
+            
+        print(f"Assistant: {response}")

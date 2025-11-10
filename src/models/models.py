@@ -16,10 +16,10 @@ load_dotenv()
 
 def anthropic_model(api_key: str = os.getenv("ANTHROPIC_API_KEY"),
     model_id: str = "claude-haiku-4-5-20251001",
-    max_tokens: int = 2000,
+    max_tokens: int = 4000,
     temperature: float = 1,
     thinking: bool = True,
-    budget_tokens: int = 1000) -> AnthropicModel:
+    budget_tokens: int = 1024) -> AnthropicModel:
     """
     List of Anthropic models
     Args:
