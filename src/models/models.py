@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 from strands.models.anthropic import AnthropicModel
+from strands.models.bedrock import BedrockModel
 from strands.models.openai import OpenAIModel
 from strands.models.ollama import OllamaModel
 from strands.models.writer import WriterModel
@@ -183,4 +184,110 @@ def writer_model(api_key: str = os.getenv("WRITER_API_KEY"),
         model_id=model_id,
         max_tokens=max_tokens,
         temperature=temperature,
+    )
+
+
+# ============================================================================
+# AMAZON BEDROCK MODEL
+# https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html
+# ============================================================================
+def bedrock_model(
+    model_id: str = "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+    region_name: str = os.getenv("AWS_REGION", "us-east-1"),
+    max_tokens: int = 4096,
+    temperature: float = 1.0,
+    top_p: float = 0.9,
+    stop_sequences: list[str] | None = None,
+    thinking: bool = False,
+    budget_tokens: int = 10000,
+    extended_context: bool = False,
+) -> BedrockModel:
+    """
+    Create an Amazon Bedrock model with support for multiple providers.
+
+    Args:
+        model_id: The Bedrock model ID (default: us.anthropic.claude-sonnet-4-5-20250929-v1:0)
+        region_name: AWS region (default: AWS_REGION env var or us-east-1)
+        max_tokens: Maximum tokens to generate (default: 4096)
+        temperature: Temperature for sampling (default: 1.0)
+        top_p: Top-p sampling parameter (default: 0.9)
+        stop_sequences: Optional list of stop sequences
+        thinking: Enable extended thinking for Anthropic models (default: False)
+        budget_tokens: Token budget for thinking when enabled (default: 10000)
+        extended_context: Enable 1M context beta for supported Anthropic models (default: False)
+
+    Returns:
+        BedrockModel
+
+    Available models by provider:
+
+    ANTHROPIC (Claude):
+    - us.anthropic.claude-sonnet-4-5-20250929-v1:0 - 200k context (1M beta) - input $3/M - output $15/M
+    - us.anthropic.claude-sonnet-4-20250514-v1:0 - 200k context (1M beta) - input $3/M - output $15/M
+    - us.anthropic.claude-3-5-sonnet-20241022-v2:0 - 200k context - input $3/M - output $15/M
+    - us.anthropic.claude-3-5-haiku-20241022-v1:0 - 200k context - input $0.80/M - output $4/M
+    - us.anthropic.claude-3-opus-20240229-v1:0 - 200k context - input $15/M - output $75/M
+
+    META (Llama):
+    - us.meta.llama4-scout-17b-instruct-v1:0 - 512k context - input $0.27/M - output $0.35/M
+    - us.meta.llama4-maverick-17b-instruct-v1:0 - 512k context - input $0.27/M - output $0.35/M
+    - us.meta.llama3-3-70b-instruct-v1:0 - 128k context - input $0.72/M - output $0.72/M
+    - meta.llama3-1-405b-instruct-v1:0 - 128k context - input $2.40/M - output $2.40/M
+
+    MISTRAL:
+    - mistral.mistral-large-2407-v1:0 - 128k context - input $2/M - output $6/M
+    - mistral.mistral-small-2409-v1:0 - 32k context - input $0.10/M - output $0.30/M
+
+    AMAZON (Nova):
+    - amazon.nova-pro-v1:0 - 300k context - input $0.80/M - output $3.20/M
+    - amazon.nova-lite-v1:0 - 300k context - input $0.06/M - output $0.24/M
+    - amazon.nova-micro-v1:0 - 128k context - input $0.035/M - output $0.14/M
+    - amazon.nova-premier-v1:0 - 1M context - input $2.50/M - output $12.50/M
+
+    COHERE:
+    - cohere.command-r-plus-v1:0 - 128k context - input $2.50/M - output $10/M
+    - cohere.command-r-v1:0 - 128k context - input $0.15/M - output $0.60/M
+
+    AI21:
+    - ai21.jamba-1-5-large-v1:0 - 256k context - input $2/M - output $8/M
+    - ai21.jamba-1-5-mini-v1:0 - 256k context - input $0.20/M - output $0.40/M
+
+    Note: Requires AWS credentials configured via:
+    - Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+    - AWS credentials file (~/.aws/credentials)
+    - IAM role (if running on AWS)
+
+    Extended thinking and 1M context are only supported on Anthropic models.
+    """
+    is_anthropic = "anthropic" in model_id.lower()
+
+    additional_params = {
+        "temperature": temperature,
+        "top_p": top_p,
+    }
+
+    if stop_sequences:
+        additional_params["stop_sequences"] = stop_sequences
+
+    # Anthropic-specific features
+    if is_anthropic:
+        if thinking:
+            if budget_tokens >= max_tokens:
+                raise ValueError("budget_tokens must be less than max_tokens")
+            additional_params["thinking"] = {
+                "type": "enabled",
+                "budget_tokens": budget_tokens,
+            }
+
+    # Extended context (1M beta) for supported Anthropic models
+    additional_headers = {}
+    if extended_context and is_anthropic:
+        additional_headers["anthropic-beta"] = "extended-context-1m-2025-04-14"
+
+    return BedrockModel(
+        model_id=model_id,
+        region_name=region_name,
+        max_tokens=max_tokens,
+        additional_request_fields=additional_params if additional_params else None,
+        additional_headers=additional_headers if additional_headers else None,
     )

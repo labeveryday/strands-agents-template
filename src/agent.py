@@ -1,168 +1,169 @@
 """
-Demo Agent
+Strands Agent - Boilerplate
 
-This agent is a demo of the Strands Agents framework.
-It uses the Anthropic claude-haiku-4-5-20251001 model to generate responses.
-It also uses the shell, editor, and current_time tools to interact with the system.
-It also uses the SlidingWindowConversationManager to manage the conversation history.
-It also uses the FileSessionManager to manage the session history.
-It also uses the LoggingHook to log the tool invocations.
-It also uses the pprint to pretty print the responses.
+A production-ready agent template integrating all framework features:
+- Multi-model support (Anthropic, Bedrock, OpenAI, Ollama, Writer)
+- Hub integration (sessions, metrics, prompts, registry)
+- Custom hooks for logging and monitoring
+- Auto-loaded tools from src/tools/
+- Conversation management with sliding window
+
+Customize the configuration section below and start building.
 """
 
-from pathlib import Path
-from datetime import datetime
-from strands import Agent
-from models import anthropic_model
-from strands.session.file_session_manager import FileSessionManager
-from strands.agent.conversation_manager import SlidingWindowConversationManager
-
-from mcp import stdio_client, StdioServerParameters
-from strands.tools.mcp import MCPClient
-
-# Hooks for logging tool invocations
-from strands.hooks import HookProvider, HookRegistry
-from strands.experimental.hooks import BeforeToolInvocationEvent
-
-from strands_tools import shell, editor, current_time
 from dotenv import load_dotenv
-from pprint import pprint
 
-
-# Load environmental variables
+# Load environment variables FIRST (before hub imports)
 load_dotenv()
 
-# import model
+from strands import Agent  # noqa: E402
+from strands.agent.conversation_manager import SlidingWindowConversationManager  # noqa: E402
+from strands_tools import shell, editor, current_time  # noqa: E402
+from pprint import pprint  # noqa: E402
+
+from models import anthropic_model  # noqa: E402
+from hooks import LoggingHook  # noqa: E402
+from hub import (  # noqa: E402
+    create_session_manager,
+    MetricsExporter,
+    S3PromptManager,
+    AgentRegistry,
+)
+from hub.session import generate_run_id  # noqa: E402
+from config import DEMO_AGENT_PROMPT  # noqa: E402
+
+
+# =============================================================================
+# CONFIGURATION - Customize these for your agent
+# =============================================================================
+
+AGENT_ID = "my-agent"  # Unique identifier for this agent
+AGENT_NAME = "My Agent"  # Display name
+PROMPT_VERSION = "v1"  # Increment when you update the system prompt
+
+# System prompt - define in src/config/prompts.py or inline here
+SYSTEM_PROMPT = DEMO_AGENT_PROMPT
+
+# Model selection - see src/models/models.py for all options
+# Examples:
+#   anthropic_model(model_id="claude-sonnet-4-5-20250929")
+#   bedrock_model(model_id="us.anthropic.claude-sonnet-4-5-20250929-v1:0")
+#   openai_model(model_id="gpt-4o")
+#   ollama_model(model_id="llama3.1:latest")
 MODEL = anthropic_model(model_id="claude-sonnet-4-5-20250929")
 
-# Create a consistent session ID
-# Configure session ID based on the current date
-SESSION_ID = datetime.now().strftime("%Y%m%d")
 
-# Create sessions directory
-SESSION_DIR = Path("./sessions")
-SESSION_DIR.mkdir(exist_ok=True)
+# =============================================================================
+# HUB INTEGRATION - Sessions, metrics, prompts, and registry
+# =============================================================================
 
-# Create session manager
-session_manager = FileSessionManager(
-    session_id=SESSION_ID,
-    storage_dir=str(SESSION_DIR)
+# Generate unique run ID for this session
+run_id = generate_run_id(AGENT_ID)
+
+# Register agent in hub (safe to call multiple times)
+registry = AgentRegistry()
+registry.register(
+    agent_id=AGENT_ID,
+    description="My custom agent",  # Update this description
+    tags=["custom"],  # Add relevant tags
 )
 
-#Create conversation manager
+# Setup versioned system prompt (syncs to S3 if enabled)
+prompt_manager = S3PromptManager(agent_id=AGENT_ID)
+prompt_manager.ensure_exists(content=SYSTEM_PROMPT, version=PROMPT_VERSION)
+system_prompt = prompt_manager.get_current()
+
+# Session manager (S3 or local based on USE_S3 env var)
+session_manager = create_session_manager(agent_id=AGENT_ID, run_id=run_id)
+
+# Conversation manager with sliding window
 conversation_manager = SlidingWindowConversationManager(
-    window_size=20,
-    should_truncate_results=True
+    window_size=20,  # Number of messages to keep in context
+    should_truncate_results=True,
+)
+
+# Metrics exporter for tracking run performance
+metrics = MetricsExporter(
+    agent_id=AGENT_ID,
+    run_id=run_id,
+    prompt_version=PROMPT_VERSION,
 )
 
 
-# Logging hook for tool invocations before they are executed
-class LoggingHook(HookProvider):
-    def __init__(self):
-        self.calls = 0
+# =============================================================================
+# AGENT SETUP
+# =============================================================================
 
-    def register_hooks(self, registry: HookRegistry) -> None:
-        registry.add_callback(BeforeToolInvocationEvent, self.log_start)
-
-    def log_start(self, event: BeforeToolInvocationEvent) -> None:
-        self.calls += 1
-        print('='* 60)
-        print(f"🔧 TOOL INVOCATION: {self.calls}")
-        print('='* 60)
-        print(f"Agent: {event.agent.name}")
-        print(f"Tool: {event.tool_use['name']}")
-        print("Input Parameters:")
-
-        # Pretty print the input with color coding
-        import json
-        formatted_input = json.dumps(event.tool_use['input'], indent=2)
-        for line in formatted_input.split('\n'):
-            print(f"{line}")
-
-        print('='* 60)
+agent = Agent(
+    model=MODEL,
+    system_prompt=system_prompt,
+    tools=[shell, current_time, editor],  # Add your tools here
+    session_manager=session_manager,
+    conversation_manager=conversation_manager,
+    hooks=[LoggingHook(verbose=True)],  # Set verbose=False to reduce output
+    name=AGENT_NAME,
+    load_tools_from_directory=True,  # Auto-loads tools from src/tools/
+)
 
 
-agentcore_mcp_client = MCPClient(lambda: stdio_client(
-    StdioServerParameters(
-        command="uvx",
-        args=["awslabs.amazon-bedrock-agentcore-mcp-server@latest"],
-        autoApprove=[
-            "search_agentcore_docs",
-            "fetch_agentcore_doc"
-        ]
-    )
-))
+# =============================================================================
+# MAIN LOOP
+# =============================================================================
 
-strands_mcp_client = MCPClient(lambda: stdio_client(
-    StdioServerParameters(
-        command="uvx",
-        args=["strands-agents-mcp-server"],
-        autoApprove=[
-            "search_docs",
-            "fetch_doc"
-        ]
-    )
-))
+def main():
+    """Run the interactive agent loop."""
+    print(f"\n{AGENT_NAME}")
+    print(f"Run ID: {run_id}")
+    print("-" * 60)
+    print("Commands: exit, model, metrics, tools, name")
+    print("-" * 60 + "\n")
 
-
-SYSTEM_PROMPT = """
-You are a helpful assistant that specializes in building and optimizing AI agents:
-- You can use the AgentCore MCP server to get information about the AgentCore platform.
-- You can use the Strands MCP server to get information about the Strands platform.
-- You can use the Model selector tool to get information about the best model for a task.
-- You can use the shell tool to interact with the system.
-- You can use the editor tool to edit files.
-- You can use the current_time tool to get the current time.
-"""
-
-
-with agentcore_mcp_client, strands_mcp_client:
-    # Get the tools from the MCP server
-    tools = agentcore_mcp_client.list_tools_sync() + strands_mcp_client.list_tools_sync()
-
-    agent = Agent(
-        model=MODEL,
-        tools=[shell, current_time, editor] + tools,
-        session_manager=session_manager,
-        conversation_manager=conversation_manager,
-        hooks=[LoggingHook()],
-        callback_handler=None,
-        name="Demo Agent",
-        load_tools_from_directory=True  # Load tools from the tools directory automatically
-        )
-
-    print("\nWelcome to the Demo Agent!\n")
-    print("- Type 'exit' to quit.")
-    print("- Type 'model' to view the model configuration.")
-    print("- Type 'metrics' to view the event loop metrics.")
-    print("- Type 'name' to view the agent name.")
-    print("- Type 'tools' to view the agent tools.\n")
+    last_result = None
 
     while True:
-        print("-" * 100)
-        prompt = input("> ")
-        print("-" * 100 + "\n")
-
-        if prompt == "exit" or prompt == "quit":
+        try:
+            prompt = input("> ")
+        except (KeyboardInterrupt, EOFError):
+            print("\n")
             break
 
+        if not prompt.strip():
+            continue
+
+        if prompt in ("exit", "quit"):
+            break
+
+        # Built-in commands
         if prompt == "model":
-            print(f"Model Configuration: {agent.model.config}")
+            print(f"Model: {agent.model.config}")
             continue
 
         if prompt == "metrics":
-            print("Event Loop Metrics:")
             pprint(agent.event_loop_metrics)
             continue
 
         if prompt == "tools":
-            print(f"Agent Tools: {agent.tool_names}")
+            print(f"Tools: {agent.tool_names}")
             continue
 
         if prompt == "name":
-            print(f"Agent Name: {agent.name}")
+            print(f"Name: {agent.name}")
             continue
 
-        response = agent(prompt)
+        # Run agent
+        last_result = agent(prompt)
+        print(f"\n{last_result}\n")
 
-        print(f"Assistant: {response}")
+    # Export metrics on exit
+    print("Exporting metrics...")
+    if last_result:
+        metrics.set_from_agent_result(last_result)
+    metrics_path = metrics.export()
+    print(f"Saved to: {metrics_path}")
+
+    # Record run in registry
+    registry.record_run(agent_id=AGENT_ID, run_id=run_id, success=True)
+
+
+if __name__ == "__main__":
+    main()

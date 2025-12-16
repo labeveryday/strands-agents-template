@@ -8,13 +8,13 @@ Created by [Du'An Lightfoot](https://duanlightfoot.com) | [@labeveryday](https:/
 
 ## Features
 
-- ✅ **Multi-Model Support** - Anthropic, OpenAI, Writer, and Ollama (local) with easy switching
-- ✅ **Model Selection Tools** - Smart model recommendations based on task requirements and constraints
-- ✅ **MCP Server Integration** - Built-in AgentCore and Strands documentation servers
-- ✅ **Session Management** - Built-in conversation history and persistence
-- ✅ **Auto-Tool Loading** - Tools automatically discovered from `src/tools/` directory
-- ✅ **Custom Hooks** - Extensible logging and monitoring system
-- ✅ **Shell, Editor & Time Tools** - Built-in Strands tools for system interaction
+- **Multi-Model Support** - Anthropic, Amazon Bedrock, OpenAI, Writer, and Ollama (local)
+- **Agent Hub** - Centralized S3-backed session, metrics, and prompt management
+- **MCP Server Integration** - Built-in AgentCore and Strands documentation servers
+- **AgentCore Ready** - Deploy to AWS Bedrock AgentCore with included examples
+- **Auto-Tool Loading** - Tools automatically discovered from `src/tools/` directory
+- **Custom Hooks** - Extensible logging and monitoring system
+- **Model Selection Tools** - Smart model recommendations based on task requirements
 
 ## Quick Start
 
@@ -28,81 +28,247 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 2. Configure API Keys
+### 2. Configure Environment
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` and add your API key (you only need ONE):
+Edit `.env` and add your API key (you only need ONE provider):
 
 ```bash
-# Choose one provider
+# Model Provider (choose one)
 ANTHROPIC_API_KEY=your_key_here
 # OR
 OPENAI_API_KEY=your_key_here
-# OR
-WRITER_API_KEY=your_key_here
+# OR use AWS credentials for Bedrock (no key needed, uses IAM)
+
+# Agent Hub (optional - enables S3 storage for sessions/metrics/prompts)
+USE_S3=false
+# AGENT_HUB_BUCKET=your-bucket-name
+# AGENT_HUB_REGION=us-east-1
 ```
 
-### 3. Run the Demo Agent
+### 3. Run the Agent
 
 ```bash
 python src/agent.py
 ```
 
-Try these commands:
-- `What model should I use for complex reasoning tasks?`
-- `Compare Claude Sonnet 4.5, GPT-4o, and O1-mini`
-- `Show me available models under $1 per million tokens`
-- `What's in the Strands documentation about hooks?`
-- Type `tools` to see all available tools
-- Type `exit` to quit
+Type `tools` to see available tools, `exit` to quit and export metrics.
 
 ## Project Structure
 
 ```
 .
 ├── src/
-│   ├── agent.py              # Main agent with MCP server integration
+│   ├── agent.py              # Boilerplate agent (customize this)
+│   ├── config/               # Agent configuration
+│   │   └── prompts.py        # System prompts
+│   ├── hooks/                # Custom hook providers
+│   │   └── logging_hook.py   # Tool invocation logging
+│   ├── hub/                  # Centralized session/metrics/prompt management
+│   │   ├── config.py         # Hub configuration
+│   │   ├── metrics.py        # Run metrics export
+│   │   ├── prompts.py        # Versioned prompt management
+│   │   ├── registry.py       # Agent registry
+│   │   └── session.py        # Session manager factory
 │   ├── models/
-│   │   └── models.py         # Model configurations (Anthropic, OpenAI, Writer, Ollama)
+│   │   └── models.py         # Model configurations (Anthropic, Bedrock, OpenAI, etc.)
 │   └── tools/                # Agent tools (auto-loaded)
-│       ├── __init__.py       # Tool exports
-│       └── model_selector.py # Model selection and comparison tools
-├── sessions/                 # Conversation history (auto-created)
-├── .env                      # API keys (you create this)
-├── CLAUDE.md                 # Project documentation for Claude Code
+│       └── model_selector.py # Model selection tools
+├── examples/
+│   └── mcp_docs_agent.py     # MCP server integration example
+├── .agent_hub/               # Local hub storage (auto-created)
+├── .env                      # API keys and hub config (you create this)
 └── requirements.txt          # Dependencies
 ```
 
-## Switching Models
+## Examples
 
-Edit `src/agent.py` line 37:
+### MCP Documentation Agent
+
+The `examples/mcp_docs_agent.py` demonstrates MCP server integration with AgentCore and Strands documentation:
+
+```bash
+cd examples
+python mcp_docs_agent.py
+```
+
+This agent can:
+- Search and fetch AWS AgentCore documentation
+- Search and fetch Strands Agents framework documentation
+- Answer questions about building and deploying agents
+
+Use this example to build agents that need access to external documentation or APIs via MCP.
+
+## Deploying to AWS Bedrock AgentCore
+
+The MCP docs agent example can be adapted and deployed to [AWS Bedrock AgentCore](https://docs.aws.amazon.com/bedrock/latest/userguide/agentcore.html) for serverless, production deployment.
+
+### Step 1: Prepare Your Agent
+
+Create a deployment-ready version of your agent:
 
 ```python
-# Current (Anthropic Claude Sonnet 4.5)
+# agentcore_agent.py
+from strands import Agent
+from strands.models.bedrock import BedrockModel
+
+def create_agent():
+    """Factory function for AgentCore deployment."""
+    model = BedrockModel(
+        model_id="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+        region_name="us-east-1",
+    )
+
+    return Agent(
+        model=model,
+        system_prompt="You are a helpful assistant...",
+        # Note: MCP tools require additional setup for AgentCore
+    )
+
+# AgentCore entry point
+agent = create_agent()
+```
+
+### Step 2: Create Requirements File
+
+```txt
+# requirements.txt for AgentCore
+strands-agents>=0.1.0
+boto3>=1.34.0
+```
+
+### Step 3: Deploy with AgentCore CLI
+
+```bash
+# Install AgentCore CLI
+pip install amazon-bedrock-agentcore-cli
+
+# Initialize AgentCore project
+agentcore init my-agent
+
+# Deploy
+agentcore deploy --agent-file agentcore_agent.py
+```
+
+### Step 4: Configure AgentCore Runtime
+
+Create `agentcore.yaml`:
+
+```yaml
+name: my-strands-agent
+runtime: python3.11
+entry_point: agentcore_agent:agent
+memory: 1024
+timeout: 300
+
+environment:
+  USE_S3: "true"
+  AGENT_HUB_BUCKET: "your-bucket-name"
+  AGENT_HUB_REGION: "us-east-1"
+```
+
+### MCP Tools on AgentCore
+
+For MCP server tools on AgentCore, you'll need to:
+
+1. Use the [AgentCore Gateway](https://docs.aws.amazon.com/bedrock/latest/userguide/agentcore-gateway.html) to expose MCP servers as Lambda functions
+2. Configure IAM permissions for cross-service access
+3. Update tool endpoints to use Gateway URLs
+
+See the [AgentCore MCP documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/agentcore-mcp.html) for detailed setup.
+
+## Model Support
+
+### Switching Models
+
+Edit `src/agent.py`:
+
+```python
+# Anthropic (direct API)
 from models import anthropic_model
 MODEL = anthropic_model(model_id="claude-sonnet-4-5-20250929")
 
-# Switch to OpenAI
+# Amazon Bedrock (multiple providers)
+from models import bedrock_model
+MODEL = bedrock_model(model_id="us.anthropic.claude-sonnet-4-5-20250929-v1:0")
+
+# Bedrock with extended thinking
+MODEL = bedrock_model(
+    model_id="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+    thinking=True,
+    budget_tokens=10000,
+    max_tokens=16000,
+)
+
+# Bedrock with 1M context (beta)
+MODEL = bedrock_model(
+    model_id="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+    extended_context=True,
+)
+
+# OpenAI
 from models import openai_model
 MODEL = openai_model(model_id="gpt-4o")
 
-# Switch to local Ollama
+# Local Ollama
 from models import ollama_model
-MODEL = ollama_model(model_id="qwen3:4b")
+MODEL = ollama_model(model_id="llama3.1:latest")
 ```
 
-See `src/models/models.py` for all available models and configurations.
+### Available Bedrock Models
 
-## Adding Your Own Tools
+| Provider | Model ID | Context |
+|----------|----------|---------|
+| Anthropic | `us.anthropic.claude-sonnet-4-5-20250929-v1:0` | 200k (1M beta) |
+| Anthropic | `us.anthropic.claude-3-5-haiku-20241022-v1:0` | 200k |
+| Meta | `us.meta.llama4-scout-17b-instruct-v1:0` | 512k |
+| Amazon | `amazon.nova-pro-v1:0` | 300k |
+| Amazon | `amazon.nova-lite-v1:0` | 300k |
+| Mistral | `mistral.mistral-large-2407-v1:0` | 128k |
+
+See `src/models/models.py` for complete model listings with pricing.
+
+## Agent Hub
+
+The hub provides centralized management for all your agents:
+
+- **Sessions** - Conversation history persisted to S3 or local storage
+- **Metrics** - Run performance data with offline sync
+- **Prompts** - Versioned system prompts with caching
+- **Registry** - Track all your agents in one place
+
+### Local Mode (default)
+
+```
+.agent_hub/
+├── sessions/           # Session data
+├── metrics/            # Run metrics by date
+│   └── 2024-12-16/
+├── prompts/            # Cached prompts per agent
+└── registry.json       # Agent registry
+```
+
+### S3 Mode
+
+Enable S3 storage by setting `USE_S3=true` in `.env`:
+
+```bash
+USE_S3=true
+AGENT_HUB_BUCKET=your-bucket-name
+AGENT_HUB_REGION=us-east-1
+```
+
+See [src/hub/README.md](src/hub/README.md) for detailed hub documentation.
+
+## Adding Tools
 
 ### Step 1: Create Tool File
 
-Create `src/tools/my_tool.py`:
-
 ```python
+# src/tools/my_tool.py
 from strands import tool
 
 @tool
@@ -120,126 +286,29 @@ def my_tool(param: str) -> str:
 
 ### Step 2: Export Tool
 
-Add to `src/tools/__init__.py`:
-
 ```python
+# src/tools/__init__.py
 from .my_tool import my_tool
 
-__all__ = [
-    # ... existing tools
-    "my_tool",
-]
+__all__ = ["my_tool"]
 ```
 
-### Step 3: Done!
+The tool auto-loads when you run the agent.
 
-The tool auto-loads when you run `python src/agent.py`. No changes needed to `agent.py`.
+## Custom Hooks
 
-## Built-in Tools
-
-### Model Selection Tools (`src/tools/model_selector.py`)
-
-| Tool | Purpose | Example Use |
-|------|---------|-------------|
-| `get_available_models` | Filter models by provider, capability, cost, or quality | Find models under $2/M tokens with reasoning capability |
-| `get_model_recommendation` | Get model suggestions based on task description | "What model for complex code generation?" |
-| `compare_models` | Compare multiple models side-by-side | Compare Claude Sonnet 4.5, GPT-4o, and O1 |
-
-### Strands Built-in Tools
-
-- `shell` - Execute shell commands
-- `editor` - Edit files with AI assistance
-- `current_time` - Get current date/time
-
-### MCP Server Tools
-
-- **AgentCore MCP** - Search and fetch AWS AgentCore documentation
-- **Strands MCP** - Search and fetch Strands Agents documentation
-
-## Configuration Options
-
-### Agent Configuration (`src/agent.py`)
+Hooks are located in `src/hooks/`:
 
 ```python
-# MCP Clients for documentation access
-agentcore_mcp_client = MCPClient(...)  # AWS AgentCore docs
-strands_mcp_client = MCPClient(...)    # Strands Agents docs
+from hooks import LoggingHook
 
-agent = Agent(
-    model=MODEL,                          # Your chosen model
-    tools=[shell, current_time, editor] + mcp_tools,  # Built-in + MCP tools
-    session_manager=session_manager,      # Persist conversations
-    conversation_manager=conversation_manager,  # Manage context window
-    hooks=[LoggingHook()],                # Custom logging/monitoring
-    name="Demo Agent",                    # Agent identifier
-    load_tools_from_directory=True        # Auto-load from src/tools/
-)
+agent = Agent(hooks=[LoggingHook(verbose=True)])
 ```
 
-### Conversation Manager
+Create your own:
 
 ```python
-# Controls context window size
-SlidingWindowConversationManager(
-    window_size=20,              # Keep last 20 messages
-    should_truncate_results=True # Truncate long tool outputs
-)
-```
-
-### Session Manager
-
-```python
-# Persists conversation history to disk
-FileSessionManager(
-    session_id=SESSION_ID,       # Daily rotation (YYYYMMDD)
-    storage_dir="./sessions"     # Storage location
-)
-```
-
-## Model Selection Guide
-
-Ask your agent for recommendations:
-
-```
-> What model should I use for complex reasoning tasks?
-> Which model is most cost-effective for high volume?
-> Show me available models with vision capability
-> Compare Claude Sonnet 4.5 and GPT-4o
-```
-
-The model selector tool analyzes your task requirements and suggests the best model based on:
-- **Cost** - Optimize for lowest price per million tokens
-- **Quality** - Prioritize output quality and capabilities
-- **Speed** - Choose fastest response times
-- **Balanced** - Best overall value
-
-Check `src/models/models.py` for detailed specifications including context windows, token limits, pricing, and capabilities.
-
-## MCP Server Integration
-
-The template includes two MCP (Model Context Protocol) servers for documentation access:
-
-### AgentCore MCP Server
-Access AWS AgentCore documentation directly in your agent:
-```
-> How do I use event handlers in AgentCore?
-> Search AgentCore docs for session management
-```
-
-### Strands MCP Server
-Query Strands Agents framework documentation:
-```
-> What are hooks in Strands?
-> How do I create async tools?
-```
-
-These servers auto-approve read-only documentation queries for seamless integration.
-
-## Advanced: Custom Hooks
-
-Add custom behavior by creating [hooks](https://strandsagents.com/latest/documentation/docs/user-guide/concepts/agents/hooks/):
-
-```python
+# src/hooks/my_hook.py
 from strands.hooks import HookProvider, HookRegistry
 from strands.experimental.hooks import BeforeToolInvocationEvent
 
@@ -249,31 +318,21 @@ class MyHook(HookProvider):
 
     def on_tool_call(self, event: BeforeToolInvocationEvent) -> None:
         print(f"Calling tool: {event.tool_use['name']}")
-
-# Add to agent
-agent = Agent(..., hooks=[MyHook()])
 ```
 
 ## Tips
 
-- **Sessions accumulate** - Clean up old files in `./sessions/` periodically
-- **Context limits** - Adjust `window_size` in conversation manager for longer/shorter context
-- **Extended thinking** - Anthropic models support extended thinking mode (see `models.py`)
-- **Local models** - Ollama models run locally with zero API costs (requires Ollama installed)
-- **Tool discovery** - Tools MUST be exported in `__init__.py` to be auto-loaded
+- **Metrics export** - Metrics are automatically exported when you type `exit`
+- **Local first** - Hub works offline and syncs to S3 when available
+- **Prompt versioning** - Use `prompt_manager.set(content, version="v2")` to update prompts
+- **Extended thinking** - Anthropic/Bedrock models support extended thinking mode
+- **Local models** - Ollama models run locally with zero API costs
 
 ## Requirements
 
 - Python 3.10+
-- Virtual environment (recommended)
-- API key for at least one provider (Anthropic, OpenAI, Writer) OR Ollama for local models
-
-## Contributing
-
-This is a personal template, but feel free to:
-- Fork for your own use
-- Submit issues if you find bugs
-- Share improvements
+- API key for at least one provider OR AWS credentials for Bedrock
+- AWS credentials (optional, for S3 hub storage and AgentCore deployment)
 
 ## License
 
@@ -284,7 +343,6 @@ MIT License - Use freely, build amazing things.
 Built by **Du'An Lightfoot** ([@labeveryday](https://github.com/labeveryday))
 - Website: [duanlightfoot.com](https://duanlightfoot.com)
 - YouTube: [LabEveryday](https://youtube.com/@labeveryday)
-- Focus: Building AI agents, teaching others, creating in public
 
 ---
 
