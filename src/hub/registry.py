@@ -40,50 +40,66 @@ class AgentRegistry:
         description: str | None = None,
         tags: list[str] | None = None,
         system_prompt_key: str | None = None,
+        repo_url: str | None = None,
+        owner: str | None = None,
+        environment: str | None = None,
+        model_id: str | None = None,
         update_if_exists: bool = False,
     ) -> dict:
         """
         Register an agent in the registry.
-        
+
         Args:
             agent_id: Unique identifier for the agent
             description: Human-readable description
             tags: List of tags for categorization
             system_prompt_key: S3 key to the system prompt
+            repo_url: URL to the agent's source code repository
+            owner: Owner/maintainer of the agent
+            environment: Deployment environment (dev, staging, prod)
+            model_id: Model ID the agent uses
             update_if_exists: Whether to update existing entry
-        
+
         Returns:
             The agent entry
         """
         registry = self._load_registry()
-        
+
         existing = registry["agents"].get(agent_id)
         if existing and not update_if_exists:
             # Already registered, return existing
             return existing
-        
+
         # Create or update entry
         entry = existing or {
             "agent_id": agent_id,
             "created_at": time.time(),
         }
-        
+
         entry["updated_at"] = time.time()
-        
+
         if description:
             entry["description"] = description
         if tags:
             entry["tags"] = tags
         if system_prompt_key:
             entry["system_prompt_key"] = system_prompt_key
-        
+        if repo_url:
+            entry["repo_url"] = repo_url
+        if owner:
+            entry["owner"] = owner
+        if environment:
+            entry["environment"] = environment
+        if model_id:
+            entry["model_id"] = model_id
+
         # Set default prompt key if not specified
         if "system_prompt_key" not in entry:
             entry["system_prompt_key"] = f"system_prompts/{agent_id}/current.txt"
-        
+
         registry["agents"][agent_id] = entry
         self._save_registry(registry)
-        
+
         return entry
     
     def get_agent(self, agent_id: str) -> Optional[dict]:
@@ -114,12 +130,20 @@ class AgentRegistry:
         agent_id: str,
         description: str | None = None,
         tags: list[str] | None = None,
+        repo_url: str | None = None,
+        owner: str | None = None,
+        environment: str | None = None,
+        model_id: str | None = None,
     ) -> Optional[dict]:
         """Update an existing agent's metadata."""
         return self.register(
             agent_id=agent_id,
             description=description,
             tags=tags,
+            repo_url=repo_url,
+            owner=owner,
+            environment=environment,
+            model_id=model_id,
             update_if_exists=True,
         )
     

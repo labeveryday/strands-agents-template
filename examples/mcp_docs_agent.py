@@ -79,6 +79,10 @@ registry.register(
     agent_id=AGENT_ID,
     description="Documentation agent with AgentCore and Strands MCP servers",
     tags=["mcp", "documentation", "agentcore", "strands"],
+    repo_url="https://github.com/labeveryday/strands-agents-template",
+    owner="labeveryday",
+    environment="dev",
+    model_id="claude-sonnet-4-5-20250929",
 )
 
 # Setup system prompt

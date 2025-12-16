@@ -66,6 +66,10 @@ registry.register(
     agent_id=AGENT_ID,
     description="My custom agent",  # Update this description
     tags=["custom"],  # Add relevant tags
+    repo_url="https://github.com/your-org/your-repo",  # Link to source code
+    owner="your-name",  # Agent maintainer
+    environment="dev",  # dev, staging, or prod
+    model_id="claude-sonnet-4-5-20250929",  # Model being used
 )
 
 # Setup versioned system prompt (syncs to S3 if enabled)
