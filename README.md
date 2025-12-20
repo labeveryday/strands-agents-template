@@ -8,7 +8,8 @@ Created by [Du'An Lightfoot](https://duanlightfoot.com) | [@labeveryday](https:/
 
 ## Features
 
-- **Multi-Model Support** - Anthropic, Amazon Bedrock, OpenAI, Writer, and Ollama (local)
+- **Multi-Model Support** - Anthropic, Amazon Bedrock, OpenAI, Gemini, Writer, and Ollama (local)
+- **Gemini Media Tools** - Image generation, video generation (Veo 3.1), and music generation (Lyria)
 - **Agent Hub** - Centralized S3-backed session, metrics, and prompt management
 - **MCP Server Integration** - Built-in AgentCore and Strands documentation servers
 - **AgentCore Ready** - Deploy to AWS Bedrock AgentCore with included examples
@@ -43,6 +44,9 @@ ANTHROPIC_API_KEY=your_key_here
 OPENAI_API_KEY=your_key_here
 # OR use AWS credentials for Bedrock (no key needed, uses IAM)
 
+# Gemini Media Tools (optional - for image/video/music generation)
+GOOGLE_API_KEY=your_google_api_key
+
 # Agent Hub (optional - enables S3 storage for sessions/metrics/prompts)
 USE_S3=false
 # AGENT_HUB_BUCKET=your-bucket-name
@@ -74,11 +78,17 @@ Type `tools` to see available tools, `exit` to quit and export metrics.
 │   │   ├── registry.py       # Agent registry
 │   │   └── session.py        # Session manager factory
 │   ├── models/
-│   │   └── models.py         # Model configurations (Anthropic, Bedrock, OpenAI, etc.)
+│   │   └── models.py         # Model configurations (Anthropic, Bedrock, OpenAI, Gemini, etc.)
 │   └── tools/                # Agent tools (auto-loaded)
-│       └── model_selector.py # Model selection tools
+│       ├── model_selector.py # Model selection tools
+│       ├── gemini_image.py   # Image generation/editing (Gemini 3 Pro)
+│       ├── gemini_video.py   # Video generation (Veo 3.1)
+│       └── gemini_music.py   # Music generation (Lyria RealTime)
 ├── examples/
-│   └── mcp_docs_agent.py     # MCP server integration example
+│   ├── mcp_docs_agent.py         # MCP server integration example
+│   ├── gemini_image_example.py   # Image generation with hub tracking
+│   ├── gemini_video_example.py   # Video generation with hub tracking
+│   └── gemini_music_example.py   # Music generation with hub tracking
 ├── .agent_hub/               # Local hub storage (auto-created)
 ├── .env                      # API keys and hub config (you create this)
 └── requirements.txt          # Dependencies
@@ -91,16 +101,25 @@ Type `tools` to see available tools, `exit` to quit and export metrics.
 The `examples/mcp_docs_agent.py` demonstrates MCP server integration with AgentCore and Strands documentation:
 
 ```bash
-cd examples
-python mcp_docs_agent.py
+python examples/mcp_docs_agent.py
 ```
 
-This agent can:
-- Search and fetch AWS AgentCore documentation
-- Search and fetch Strands Agents framework documentation
-- Answer questions about building and deploying agents
+### Gemini Media Examples
 
-Use this example to build agents that need access to external documentation or APIs via MCP.
+Generate images, videos, and music with hub-integrated tracking:
+
+```bash
+# Image generation (Gemini 3 Pro)
+python examples/gemini_image_example.py --prompt "A mountain landscape at sunset"
+
+# Video generation (Veo 3.1) - takes 1-5 minutes
+python examples/gemini_video_example.py --prompt "A drone shot over a coastal city"
+
+# Music generation (Lyria RealTime)
+python examples/gemini_music_example.py --prompt "Upbeat electronic dance track"
+```
+
+All examples support `--interactive` mode and `--no-hub` flag. See [examples/README.md](examples/README.md) for full documentation.
 
 ## Model Support
 
@@ -138,6 +157,10 @@ MODEL = openai_model(model_id="gpt-4o")
 # Local Ollama
 from models import ollama_model
 MODEL = ollama_model(model_id="llama3.1:latest")
+
+# Gemini (for agents using Gemini models)
+from models import gemini_model
+MODEL = gemini_model(model_id="gemini-2.0-flash")
 ```
 
 ### Available Bedrock Models
@@ -150,6 +173,14 @@ MODEL = ollama_model(model_id="llama3.1:latest")
 | Amazon | `amazon.nova-pro-v1:0` | 300k |
 | Amazon | `amazon.nova-lite-v1:0` | 300k |
 | Mistral | `mistral.mistral-large-2407-v1:0` | 128k |
+
+### Gemini Media Models
+
+| Model | Tool | Description |
+|-------|------|-------------|
+| `gemini-3-pro-image-preview` | `generate_image`, `edit_image` | Image generation and editing |
+| `veo-3.1-generate-preview` | `generate_video`, `generate_video_from_image` | Video generation (4-6 seconds) |
+| `lyria-realtime-exp` | `generate_music`, `generate_music_weighted` | Music generation (5-120 seconds) |
 
 See `src/models/models.py` for complete model listings with pricing.
 

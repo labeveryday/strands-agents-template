@@ -5,6 +5,7 @@ from strands.models.bedrock import BedrockModel
 from strands.models.openai import OpenAIModel
 from strands.models.ollama import OllamaModel
 from strands.models.writer import WriterModel
+from strands.models.gemini import GeminiModel
 
 
 # Load environment variables
@@ -184,6 +185,67 @@ def writer_model(api_key: str = os.getenv("WRITER_API_KEY"),
         model_id=model_id,
         max_tokens=max_tokens,
         temperature=temperature,
+    )
+
+
+# ============================================================================
+# GEMINI MODEL
+# https://ai.google.dev/gemini-api/docs/models
+# ============================================================================
+def gemini_model(api_key: str = os.getenv("GOOGLE_API_KEY"),
+    model_id: str = "gemini-3-flash-preview",
+    max_tokens: int = 8192,
+    temperature: float = 1,
+    top_p: float = 0.95,
+    top_k: int = 40,
+    thinking: bool = False,
+    budget_tokens: int = 1024,
+    **kwargs) -> GeminiModel:
+    """
+    List of Gemini models
+    Args:
+        api_key: The API key to use (default: os.getenv("GOOGLE_API_KEY")
+        model_id: The model ID to use (default: gemini-3-flash-preview)
+        max_tokens: The maximum number of tokens to generate (default: 8192)
+        temperature: The temperature to use (default: 1)
+        top_p: The top_p to use (default: 0.95)
+        top_k: The top_k to use (default: 40)
+        thinking: Whether to enable thinking/reasoning mode (default: False)
+        budget_tokens: The budget for thinking tokens (default: 1024)
+        **kwargs: Additional model parameters (e.g. aspect_ratio for image gen)
+    Returns:
+        GeminiModel
+
+    Available models:
+    - gemini-3-pro-preview - 1M context - 65k max_output tokens - input $2/M - output $12/M (tiered >200k)
+    - gemini-3-flash-preview - 1M context - 65k max_output tokens - input $0.50/M - output $3.00/M
+    - gemini-3-pro-image-preview (nano banana) - Input $2/M - Output (Text) $12/M - Output (Image) $120/M
+    
+    Note: Gemini 3 Pro Image Input is 560 tokens per image. 
+    Image output consumes: 1K/2K (1120 tokens, ~$0.134) or 4K (2000 tokens, ~$0.24).
+    Gemini 3 Paid Tier ensures data privacy (No training). 
+    Grounding with Google Search billing starts Jan 5, 2026.
+    Context Caching for Flash: $0.05/M processing + $1.00/M/hour storage.
+    """
+    params = {
+        "max_output_tokens": max_tokens,
+        "temperature": temperature,
+        "top_p": top_p,
+        "top_k": top_k,
+        **kwargs
+    }
+
+    if thinking:
+        params["thinking_config"] = {"include_thoughts": True}
+        if budget_tokens:
+            params["max_output_tokens"] = max_tokens + budget_tokens
+
+    return GeminiModel(
+        client_args={
+            "api_key": api_key,
+        },
+        model_id=model_id,
+        params=params
     )
 
 

@@ -7,6 +7,7 @@ from .models import (
     ollama_model,
     openai_model,
     writer_model,
+    gemini_model,
 )
 
 __all__ = [
@@ -15,4 +16,5 @@ __all__ = [
     "ollama_model",
     "openai_model",
     "writer_model",
+    "gemini_model",
 ]

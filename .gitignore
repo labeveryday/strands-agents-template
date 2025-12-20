@@ -210,3 +210,5 @@ sessions/
 .agent_hub/
 CLAUDE.md
 .claude
+
+.DS_Store

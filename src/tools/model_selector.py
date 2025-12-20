@@ -233,6 +233,80 @@ MODELS = {
         "use_cases": ["creative writing", "content creation", "marketing copy"]
     },
 
+    # ========== GOOGLE GEMINI MODELS ==========
+    "gemini-3-pro-preview": {
+        "provider": "google",
+        "name": "Gemini 3 Pro (Preview)",
+        "capabilities": ["chat", "reasoning", "code", "analysis", "multimodal", "long-context", "thinking"],
+        "context_window": 1000000,
+        "max_output_tokens": 65000,
+        "cost_input": 2.00,  # Base price for <= 200k tokens
+        "cost_output": 12.00, # Base price for <= 200k tokens
+        "speed": "medium",
+        "quality": "highest",
+        "use_cases": ["complex reasoning", "frontier tasks", "deep analysis", "thinking/reasoning", "data privacy (paid tier)"]
+    },
+    "gemini-3-pro-image-preview": {
+        "provider": "google",
+        "name": "Gemini 3 Pro Image (Preview 🍌)",
+        "capabilities": ["chat", "reasoning", "multimodal", "image-generation", "thinking"],
+        "context_window": 1000000,
+        "max_output_tokens": 65000,
+        "cost_input": 2.00,
+        "cost_output": 12.00,  # $120/M for images specifically
+        "speed": "fast",
+        "quality": "highest",
+        "use_cases": ["native image generation", "native multimodal tasks", "flexible visual output"]
+    },
+    "gemini-3-flash-preview": {
+        "provider": "google",
+        "name": "Gemini 3 Flash (Preview)",
+        "capabilities": ["chat", "code", "multimodal", "long-context"],
+        "context_window": 1000000,
+        "max_output_tokens": 65000,
+        "cost_input": 0.50,
+        "cost_output": 3.00,
+        "speed": "fast",
+        "quality": "high",
+        "use_cases": ["fast real-time tasks", "cost-effective multimodal", "high volume", "data privacy (paid tier)"]
+    },
+    "gemini-2.5-pro": {
+        "provider": "google",
+        "name": "Gemini 2.5 Pro",
+        "capabilities": ["chat", "reasoning", "code", "analysis", "multimodal", "long-context"],
+        "context_window": 2000000,
+        "max_output_tokens": 128000,
+        "cost_input": 1.25,
+        "cost_output": 10.00,
+        "speed": "medium",
+        "quality": "highest",
+        "use_cases": ["complex reasoning", "long context analysis", "multimodal tasks"]
+    },
+    "gemini-2.5-flash": {
+        "provider": "google",
+        "name": "Gemini 2.5 Flash",
+        "capabilities": ["chat", "reasoning", "code", "analysis", "multimodal", "long-context"],
+        "context_window": 1000000,
+        "max_output_tokens": 65000,
+        "cost_input": 0.10,
+        "cost_output": 0.40,
+        "speed": "fast",
+        "quality": "high",
+        "use_cases": ["fast responses", "cost-effective multimodal", "long context"]
+    },
+    "gemini-2.5-flash-lite": {
+        "provider": "google",
+        "name": "Gemini 2.5 Flash Lite",
+        "capabilities": ["chat", "code", "multimodal", "long-context"],
+        "context_window": 1000000,
+        "max_output_tokens": 65000,
+        "cost_input": 0.075,
+        "cost_output": 0.30,
+        "speed": "fast",
+        "quality": "good",
+        "use_cases": ["ultra-low cost", "high volume", "long context"]
+    },
+
     # ========== OLLAMA MODELS (Local) ==========
     "qwen3:4b": {
         "provider": "ollama",
@@ -275,7 +349,7 @@ MODELS = {
 
 @tool
 def get_available_models(
-    provider: Optional[Literal["anthropic", "openai", "writer", "ollama"]] = None,
+    provider: Optional[Literal["anthropic", "openai", "writer", "google", "ollama"]] = None,
     capability: Optional[str] = None,
     max_cost_input: Optional[float] = None,
     min_quality: Optional[Literal["good", "high", "highest"]] = None
@@ -287,7 +361,7 @@ def get_available_models(
     requirements like cost, quality, speed, or capabilities.
 
     Args:
-        provider: Filter by provider (anthropic, openai, writer, or ollama)
+        provider: Filter by provider (anthropic, openai, writer, google, or ollama)
         capability: Filter by capability (chat, reasoning, code, vision, local, etc.)
         max_cost_input: Maximum input cost per 1M tokens (0 for free/local models)
         min_quality: Minimum quality level (good, high, highest)
@@ -308,8 +382,8 @@ def get_available_models(
         Find local/free models:
         get_available_models(provider="ollama")
 
-        Find Writer models for long context:
-        get_available_models(provider="writer", capability="long-context")
+        Find Google models for long context:
+        get_available_models(provider="google", capability="long-context")
     """
     import json
 
@@ -364,6 +438,7 @@ def get_model_recommendation(
 
     # Analyze task requirements
     needs_vision = any(word in task_lower for word in ["image", "vision", "picture", "visual", "multimodal"])
+    needs_image_gen = any(word in task_lower for word in ["generate image", "create image", "draw", "make a picture"])
     needs_reasoning = any(word in task_lower for word in ["complex", "reasoning", "math", "science", "research", "deep"])
     needs_code = any(word in task_lower for word in ["code", "programming", "debug", "implement", "software"])
     needs_long_context = any(word in task_lower for word in ["long", "large", "extensive", "document", "codebase"])
@@ -386,8 +461,8 @@ def get_model_recommendation(
             recommended = "gpt-5-nano-2025-08-07"
             reasoning = "Ultra-low-cost model at $0.05/M input, good for simple tasks"
         elif needs_long_context:
-            recommended = "palmyra-x5"
-            reasoning = "1M context window at only $0.60/M input - best for long documents"
+            recommended = "gemini-2.5-flash-lite"
+            reasoning = "1M context window at only $0.075/M input - most cost-effective for large documents"
         else:
             recommended = "gpt-5-mini-2025-08-07"
             reasoning = "Excellent balance of cost ($0.25/M) and capability with reasoning"
@@ -395,14 +470,14 @@ def get_model_recommendation(
     # Quality-optimized
     elif priority == "quality":
         if needs_reasoning:
-            recommended = "o4-mini-deep-research-2025-06-26"
-            reasoning = "Best deep reasoning and research model with extensive analysis capability"
+            recommended = "gemini-3-pro-preview"
+            reasoning = "Newest frontier model with advanced reasoning and thinking capabilities"
         elif needs_code:
             recommended = "claude-sonnet-4-5-20250929"
             reasoning = "Highest quality code generation with extended thinking"
         elif needs_long_context:
-            recommended = "gpt-4.1-2025-04-14"
-            reasoning = "1M context window for extensive documents and large codebases"
+            recommended = "gemini-2.5-pro"
+            reasoning = "2M context window - industry leading for extremely long documents and large codebases"
         else:
             recommended = "gpt-5-pro-2025-10-06"
             reasoning = "Highest quality output with 272K max tokens, ideal for critical tasks"
@@ -416,8 +491,8 @@ def get_model_recommendation(
             recommended = "gpt-4o-2024-11-20"
             reasoning = "Fast multimodal model with vision capability"
         else:
-            recommended = "claude-haiku-4-5-20251001"
-            reasoning = "Fastest reasoning-capable model with good quality"
+            recommended = "gemini-3-flash-preview"
+            reasoning = "Newest high-speed model with improved quality and latency"
 
     # Balanced
     else:
@@ -430,12 +505,15 @@ def get_model_recommendation(
         elif is_creative:
             recommended = "palmyra-creative"
             reasoning = "Specialized model for creative writing and content generation"
+        elif needs_image_gen:
+            recommended = "gemini-3-pro-image-preview"
+            reasoning = "Native image generation model (use this model directly for image outputs)"
         elif needs_local:
             recommended = "qwen3:4b"
             reasoning = "Best local model with 260k context and tool support"
         elif needs_reasoning and not is_simple:
-            recommended = "o4-mini-2025-04-16"
-            reasoning = "Strong reasoning capability at reasonable cost"
+            recommended = "gemini-3-pro-preview"
+            reasoning = "Advanced reasoning and thinking at competitive price"
         elif needs_vision:
             recommended = "gpt-4o-2024-11-20"
             reasoning = "Best multimodal model with vision capability"
@@ -443,14 +521,14 @@ def get_model_recommendation(
             recommended = "claude-sonnet-4-5-20250929"
             reasoning = "Excellent code generation with extended thinking"
         elif needs_long_context:
-            recommended = "palmyra-x5"
-            reasoning = "1M context window at great price point"
+            recommended = "gemini-2.5-flash"
+            reasoning = "1M context window at excellent price point with fast performance"
         elif is_simple:
-            recommended = "gpt-5-mini-2025-08-07"
-            reasoning = "Fast and cost-effective with reasoning capability"
+            recommended = "gemini-3-flash-preview"
+            reasoning = "Newest fast model, excellent for simple tasks"
         else:
-            recommended = "claude-sonnet-4-5-20250929"
-            reasoning = "Best general-purpose model with extended thinking and 200k context"
+            recommended = "gemini-3-pro-preview"
+            reasoning = "Best frontier model for general reasoning and thinking tasks"
 
     result = {
         "recommended_model": recommended,
@@ -458,6 +536,7 @@ def get_model_recommendation(
         "reasoning": reasoning,
         "task_analysis": {
             "needs_vision": needs_vision,
+            "needs_image_gen": needs_image_gen,
             "needs_reasoning": needs_reasoning,
             "needs_code": needs_code,
             "needs_long_context": needs_long_context,
