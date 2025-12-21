@@ -9,7 +9,7 @@ Created by [Du'An Lightfoot](https://duanlightfoot.com) | [@labeveryday](https:/
 ## Features
 
 - **Multi-Model Support** - Anthropic, Amazon Bedrock, OpenAI, Gemini, Writer, and Ollama (local)
-- **Gemini Media Tools** - Image generation, video generation (Veo 3.1), and music generation (Lyria)
+- **Gemini Media Tools** - Image generation, video generation (Veo 3.1), music generation (Lyria), and video understanding (Gemini 3)
 - **Agent Hub** - Centralized S3-backed session, metrics, and prompt management
 - **MCP Server Integration** - Built-in AgentCore and Strands documentation servers
 - **AgentCore Ready** - Deploy to AWS Bedrock AgentCore with included examples
@@ -81,13 +81,16 @@ Type `tools` to see available tools, `exit` to quit and export metrics.
 │   │   └── models.py         # Model configurations (Anthropic, Bedrock, OpenAI, Gemini, etc.)
 │   └── tools/                # Agent tools (auto-loaded)
 │       ├── model_selector.py # Model selection tools
-│       ├── gemini_image.py   # Image generation/editing (Gemini 3 Pro)
-│       ├── gemini_video.py   # Video generation (Veo 3.1)
+│       ├── gemini_image.py   # Image generation/editing (Gemini 2.5 Flash/3 Pro)
+│       ├── gemini_image_understanding.py # Image analysis, detection, segmentation
+│       ├── gemini_video.py   # Video generation/extension (Veo 3.1/3/2)
+│       ├── gemini_video_understanding.py # Video understanding (Gemini 3 Pro/Flash)
 │       └── gemini_music.py   # Music generation (Lyria RealTime)
 ├── examples/
 │   ├── mcp_docs_agent.py         # MCP server integration example
 │   ├── gemini_image_example.py   # Image generation with hub tracking
 │   ├── gemini_video_example.py   # Video generation with hub tracking
+│   ├── gemini_video_understanding_example.py # Video understanding (upload/inline/YouTube)
 │   └── gemini_music_example.py   # Music generation with hub tracking
 ├── .agent_hub/               # Local hub storage (auto-created)
 ├── .env                      # API keys and hub config (you create this)
@@ -114,6 +117,15 @@ python examples/gemini_image_example.py --prompt "A mountain landscape at sunset
 
 # Video generation (Veo 3.1) - takes 1-5 minutes
 python examples/gemini_video_example.py --prompt "A drone shot over a coastal city"
+
+# Video understanding (Gemini 3 Pro/Flash): upload/inline/YouTube URL
+python examples/gemini_video_understanding_example.py --youtube-url "https://www.youtube.com/watch?v=9hE5-98ZeCg" --prompt "Summarize in 3 sentences"
+
+# Interactive mode (hub tracking enabled by default; disable with --no-hub)
+python examples/gemini_video_understanding_example.py --youtube-url "https://www.youtube.com/watch?v=9hE5-98ZeCg" --interactive
+
+# Note: Gemini 3 requires thought signatures for tool calling. This repo includes a workaround in the example
+# so you can run the Strands Agent on Gemini 3 while the tool uses Gemini 3 as well.
 
 # Music generation (Lyria RealTime)
 python examples/gemini_music_example.py --prompt "Upbeat electronic dance track"
@@ -178,8 +190,15 @@ MODEL = gemini_model(model_id="gemini-2.0-flash")
 
 | Model | Tool | Description |
 |-------|------|-------------|
-| `gemini-3-pro-image-preview` | `generate_image`, `edit_image` | Image generation and editing |
-| `veo-3.1-generate-preview` | `generate_video`, `generate_video_from_image` | Video generation (4-6 seconds) |
+| `gemini-2.5-flash-image` | `generate_image`, `edit_image` | Fast image generation (1K) |
+| `gemini-3-pro-image-preview` | `generate_image`, `edit_image` | Advanced image gen (1K-4K, Google Search, 14 ref images) |
+| `gemini-2.5-flash` | `understand_image`, `detect_objects`, `segment_objects` | Image understanding, detection, segmentation |
+| `gemini-3-flash-preview` | `understand_image`, `detect_objects`, `segment_objects`, `understand_video` | Fast multimodal understanding |
+| `gemini-3-pro-preview` | `understand_image`, `detect_objects`, `segment_objects`, `understand_video` | Advanced multimodal understanding |
+| `veo-3.1-generate-preview` | `generate_video`, `generate_video_from_image`, `extend_video` | Video gen (4-8s, 720p/1080p, audio, ref images, extension) |
+| `veo-3.1-fast-generate-preview` | `generate_video`, `generate_video_from_image`, `extend_video` | Fast video gen with audio |
+| `veo-3.0-generate-001` | `generate_video`, `generate_video_from_image` | Stable video gen with audio |
+| `veo-2.0-generate-001` | `generate_video`, `generate_video_from_image` | Video gen (silent, no audio) |
 | `lyria-realtime-exp` | `generate_music`, `generate_music_weighted` | Music generation (5-120 seconds) |
 
 See `src/models/models.py` for complete model listings with pricing.

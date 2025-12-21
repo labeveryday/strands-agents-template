@@ -211,4 +211,9 @@ sessions/
 CLAUDE.md
 .claude
 
+# Generated output
+output/
+image_samples
+
+
 .DS_Store

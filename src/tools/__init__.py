@@ -11,9 +11,20 @@ from .gemini_image import (
     edit_image,
 )
 
+from .gemini_image_understanding import (
+    understand_image,
+    detect_objects,
+    segment_objects,
+)
+
 from .gemini_video import (
     generate_video,
     generate_video_from_image,
+    extend_video,
+)
+
+from .gemini_video_understanding import (
+    understand_video,
 )
 
 from .gemini_music import (
@@ -29,9 +40,15 @@ __all__ = [
     # Gemini image tools
     "generate_image",
     "edit_image",
+    # Gemini image understanding tools
+    "understand_image",
+    "detect_objects",
+    "segment_objects",
     # Gemini video tools
     "generate_video",
     "generate_video_from_image",
+    "extend_video",
+    "understand_video",
     # Gemini music tools
     "generate_music",
     "generate_music_weighted",

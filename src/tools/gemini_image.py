@@ -1,219 +1,416 @@
 """
 Gemini Image Generation Tool
 
-Uses gemini-3-pro-image-preview for high-quality image generation.
-Supports various aspect ratios and resolutions (1K, 2K, 4K).
+Supports both Gemini 2.5 Flash Image (fast) and Gemini 3 Pro Image Preview (advanced).
+Features:
+- Text-to-image generation
+- Image editing (text-and-image-to-image)
+- Multiple reference images (up to 14 for Gemini 3 Pro)
+- Aspect ratio control
+- Resolution control (1K, 2K, 4K for Gemini 3 Pro)
+- Google Search grounding (Gemini 3 Pro)
 """
 
 import os
-import base64
 from pathlib import Path
 from datetime import datetime
+from typing import Literal, Optional, List
+
 from strands import tool
 from google import genai
 from google.genai import types
 
 
+ImageModel = Literal["gemini-2.5-flash-image", "gemini-3-pro-image-preview"]
+AspectRatio = Literal["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"]
+ImageSize = Literal["1K", "2K", "4K"]
+
+
+def _get_mime_type(path: Path) -> str:
+    """Get MIME type from file extension."""
+    suffix = path.suffix.lower()
+    mime_map = {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+        ".gif": "image/gif",
+    }
+    return mime_map.get(suffix, "image/png")
+
+
+def _load_image_part(image_path: str) -> types.Part:
+    """Load an image file and return a Part object."""
+    path = Path(image_path)
+    if not path.exists():
+        raise FileNotFoundError(f"Image file not found: {image_path}")
+
+    with open(path, "rb") as f:
+        image_bytes = f.read()
+
+    mime_type = _get_mime_type(path)
+    return types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+
+
 @tool
 def generate_image(
     prompt: str,
+    model: ImageModel = "gemini-3-pro-image-preview",
+    aspect_ratio: Optional[AspectRatio] = None,
+    image_size: Optional[ImageSize] = None,
+    use_google_search: bool = False,
+    reference_images: Optional[List[str]] = None,
+    num_images: int = 1,
     output_dir: str = "output",
 ) -> dict:
     """
-    Generate an image using Gemini 3 Pro Image Preview.
+    Generate an image using Gemini image models.
 
     Args:
         prompt: Text description of the image to generate. Be specific and descriptive.
-        output_dir: Directory to save the generated image (default: "output")
+        model: Model to use - "gemini-2.5-flash-image" (fast) or "gemini-3-pro-image-preview" (advanced, default).
+        aspect_ratio: Output aspect ratio. Options: "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9".
+        image_size: Resolution for Gemini 3 Pro only. Options: "1K" (default), "2K", "4K".
+        use_google_search: Enable Google Search grounding for real-time info (Gemini 3 Pro only).
+        reference_images: List of paths to reference images (up to 3 for Flash, up to 14 for Pro).
+        output_dir: Directory to save the generated image (default: "output").
 
     Returns:
         dict with keys:
             - success: bool indicating if generation succeeded
-            - file_path: path to saved image (if successful)
+            - file_path: path to first saved image (if successful)
+            - file_paths: list of saved image paths (if successful)
             - message: status message
+            - text_response: any text from the model
             - error: error message (if failed)
+            - results: per-image results (paths/errors)
 
-    Notes:
-        - Gemini 3 Pro Image Preview generates high quality images
-        - Output is PNG format
-        - Requires GOOGLE_API_KEY environment variable
+    Examples:
+        # Basic generation
+        generate_image(prompt="A serene mountain landscape at sunset")
+
+        # Fast generation with aspect ratio
+        generate_image(prompt="A logo for a coffee shop", model="gemini-2.5-flash-image", aspect_ratio="1:1")
+
+        # High-res with Google Search grounding
+        generate_image(prompt="Current weather forecast for San Francisco as an infographic",
+                      model="gemini-3-pro-image-preview", image_size="2K", use_google_search=True)
+
+        # Style transfer with reference image
+        generate_image(prompt="Transform this photo into Van Gogh's Starry Night style",
+                      reference_images=["photo.png"])
     """
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
-        return {
-            "success": False,
-            "error": "GOOGLE_API_KEY environment variable not set"
-        }
+        return {"success": False, "error": "GOOGLE_API_KEY environment variable not set"}
+
+    if num_images < 1 or num_images > 20:
+        return {"success": False, "error": "num_images must be between 1 and 20"}
+
+    # Validate model-specific features
+    if model == "gemini-2.5-flash-image":
+        if image_size:
+            return {"success": False, "error": "image_size is only supported with gemini-3-pro-image-preview"}
+        if use_google_search:
+            return {"success": False, "error": "Google Search grounding is only supported with gemini-3-pro-image-preview"}
+        if reference_images and len(reference_images) > 3:
+            return {"success": False, "error": "gemini-2.5-flash-image supports up to 3 reference images"}
+
+    if reference_images and len(reference_images) > 14:
+        return {"success": False, "error": "Maximum 14 reference images supported"}
 
     try:
         client = genai.Client(api_key=api_key)
 
-        response = client.models.generate_content(
-            model="gemini-3-pro-image-preview",
-            contents=[prompt],
-            config=types.GenerateContentConfig(
-                response_modalities=["IMAGE", "TEXT"],
-            ),
-        )
+        # Build contents
+        contents = []
 
-        # Extract image from response
-        image_data = None
-        text_response = None
+        # Add reference images first if provided
+        if reference_images:
+            for img_path in reference_images:
+                try:
+                    contents.append(_load_image_part(img_path))
+                except FileNotFoundError as e:
+                    return {"success": False, "error": str(e)}
 
-        if response.candidates:
-            for part in response.candidates[0].content.parts:
-                if hasattr(part, 'inline_data') and part.inline_data:
-                    image_data = part.inline_data.data
-                elif hasattr(part, 'text') and part.text:
-                    text_response = part.text
+        # Add text prompt
+        contents.append(prompt)
 
-        if not image_data:
-            return {
-                "success": False,
-                "error": "No image data in response",
-                "text_response": text_response
-            }
+        # Build image config
+        image_config = {}
+        if aspect_ratio:
+            image_config["aspect_ratio"] = aspect_ratio
+        if image_size and model == "gemini-3-pro-image-preview":
+            image_config["image_size"] = image_size
 
-        # Save image
+        # Build generation config
+        config_kwargs = {
+            "response_modalities": ["IMAGE", "TEXT"],
+        }
+        if image_config:
+            config_kwargs["image_config"] = types.ImageConfig(**image_config)
+
+        # Add Google Search tool if requested
+        if use_google_search and model == "gemini-3-pro-image-preview":
+            config_kwargs["tools"] = [{"google_search": {}}]
+
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"gemini_image_{timestamp}.png"
-        file_path = output_path / filename
+        results: list[dict] = []
+        file_paths: list[str] = []
+        text_responses: list[str] = []
 
-        with open(file_path, "wb") as f:
-            f.write(image_data)
+        for i in range(num_images):
+            response = client.models.generate_content(
+                model=model,
+                contents=contents,
+                config=types.GenerateContentConfig(**config_kwargs),
+            )
+
+            # Extract image from response
+            image_data = None
+            text_response = None
+
+            if response.candidates:
+                for part in response.candidates[0].content.parts:
+                    # Skip thought parts
+                    if hasattr(part, "thought") and part.thought:
+                        continue
+                    if hasattr(part, "inline_data") and part.inline_data:
+                        image_data = part.inline_data.data
+                    elif hasattr(part, "text") and part.text:
+                        text_response = part.text
+
+            if not image_data:
+                results.append(
+                    {
+                        "success": False,
+                        "error": "No image data in response",
+                        "text_response": text_response,
+                    }
+                )
+                continue
+
+            filename = f"gemini_image_{timestamp}_{i+1:02d}.png" if num_images > 1 else f"gemini_image_{timestamp}.png"
+            file_path = output_path / filename
+            with open(file_path, "wb") as f:
+                f.write(image_data)
+
+            file_paths.append(str(file_path))
+            if text_response:
+                text_responses.append(text_response)
+            results.append(
+                {
+                    "success": True,
+                    "file_path": str(file_path),
+                    "text_response": text_response,
+                }
+            )
+
+        if not file_paths:
+            # All failed
+            return {
+                "success": False,
+                "error": "Failed to generate any images",
+                "model": model,
+                "results": results,
+            }
 
         return {
             "success": True,
-            "file_path": str(file_path),
-            "message": f"Image saved to {file_path}",
-            "text_response": text_response
+            "file_path": file_paths[0],
+            "file_paths": file_paths,
+            "message": f"Saved {len(file_paths)} image(s) to {output_path}",
+            "model": model,
+            "text_response": text_responses[0] if text_responses else None,
+            "results": results,
         }
 
     except Exception as e:
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        return {"success": False, "error": str(e)}
 
 
 @tool
 def edit_image(
     prompt: str,
     image_path: str,
+    model: ImageModel = "gemini-3-pro-image-preview",
+    aspect_ratio: Optional[AspectRatio] = None,
+    image_size: Optional[ImageSize] = None,
+    additional_images: Optional[List[str]] = None,
+    num_images: int = 1,
     output_dir: str = "output",
-    mask_path: str = None,
 ) -> dict:
     """
-    Edit an existing image using Gemini 3 Pro Image Preview.
+    Edit an existing image using Gemini image models.
+
+    Supports various editing operations:
+    - Add/remove/modify elements
+    - Style transfer
+    - Inpainting (semantic masking via description)
+    - Combine multiple images
 
     Args:
-        prompt: Text description of the edits to make.
-        image_path: Path to the input image to edit.
-        output_dir: Directory to save the edited image (default: "output")
-        mask_path: Optional path to a mask image for targeted edits.
+        prompt: Text description of the edits to make. Be specific about what to change.
+        image_path: Path to the primary input image to edit.
+        model: Model to use - "gemini-2.5-flash-image" (fast) or "gemini-3-pro-image-preview" (advanced, default).
+        aspect_ratio: Output aspect ratio. Options: "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9".
+        image_size: Resolution for Gemini 3 Pro only. Options: "1K" (default), "2K", "4K".
+        additional_images: Additional reference images for composition/style transfer.
+        output_dir: Directory to save the edited image (default: "output").
 
     Returns:
         dict with keys:
             - success: bool indicating if edit succeeded
-            - file_path: path to saved image (if successful)
+            - file_path: path to first saved image (if successful)
+            - file_paths: list of saved image paths (if successful)
             - message: status message
+            - text_response: any text from the model
             - error: error message (if failed)
+            - results: per-image results (paths/errors)
 
-    Notes:
-        - Supports PNG, JPEG, and WebP input formats
-        - Mask should be black (keep) and white (edit) areas
-        - Requires GOOGLE_API_KEY environment variable
+    Examples:
+        # Simple edit
+        edit_image(prompt="Add a wizard hat to the cat", image_path="cat.png")
+
+        # Inpainting (semantic mask)
+        edit_image(prompt="Change only the sofa to a brown leather chesterfield", image_path="living_room.png")
+
+        # Style transfer
+        edit_image(prompt="Transform into Van Gogh's Starry Night style", image_path="city.png")
+
+        # Combine images (e.g., put dress on model)
+        edit_image(prompt="Put the dress from the first image on the woman from the second",
+                  image_path="dress.png", additional_images=["model.png"])
     """
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
-        return {
-            "success": False,
-            "error": "GOOGLE_API_KEY environment variable not set"
-        }
+        return {"success": False, "error": "GOOGLE_API_KEY environment variable not set"}
 
-    image_file = Path(image_path)
-    if not image_file.exists():
-        return {
-            "success": False,
-            "error": f"Image file not found: {image_path}"
-        }
+    if num_images < 1 or num_images > 20:
+        return {"success": False, "error": "num_images must be between 1 and 20"}
+
+    # Validate model-specific features
+    if model == "gemini-2.5-flash-image":
+        if image_size:
+            return {"success": False, "error": "image_size is only supported with gemini-3-pro-image-preview"}
 
     try:
         client = genai.Client(api_key=api_key)
 
-        # Read and encode input image
-        with open(image_file, "rb") as f:
-            image_bytes = f.read()
+        # Build contents - images first, then prompt
+        contents = []
 
-        # Determine mime type
-        suffix = image_file.suffix.lower()
-        mime_map = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
-        mime_type = mime_map.get(suffix, "image/png")
+        # Add primary image
+        try:
+            contents.append(_load_image_part(image_path))
+        except FileNotFoundError as e:
+            return {"success": False, "error": str(e)}
 
-        contents = [
-            types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
-            prompt
-        ]
+        # Add additional images if provided
+        if additional_images:
+            for img_path in additional_images:
+                try:
+                    contents.append(_load_image_part(img_path))
+                except FileNotFoundError as e:
+                    return {"success": False, "error": str(e)}
 
-        # Add mask if provided
-        if mask_path:
-            mask_file = Path(mask_path)
-            if mask_file.exists():
-                with open(mask_file, "rb") as f:
-                    mask_bytes = f.read()
-                mask_suffix = mask_file.suffix.lower()
-                mask_mime = mime_map.get(mask_suffix, "image/png")
-                contents.insert(1, types.Part.from_bytes(data=mask_bytes, mime_type=mask_mime))
+        # Add text prompt last
+        contents.append(prompt)
 
-        response = client.models.generate_content(
-            model="gemini-3-pro-image-preview",
-            contents=contents,
-            config=types.GenerateContentConfig(
-                response_modalities=["IMAGE", "TEXT"],
-            ),
-        )
+        # Build image config
+        image_config = {}
+        if aspect_ratio:
+            image_config["aspect_ratio"] = aspect_ratio
+        if image_size and model == "gemini-3-pro-image-preview":
+            image_config["image_size"] = image_size
 
-        # Extract image from response
-        image_data = None
-        text_response = None
+        # Build generation config
+        config_kwargs = {
+            "response_modalities": ["IMAGE", "TEXT"],
+        }
+        if image_config:
+            config_kwargs["image_config"] = types.ImageConfig(**image_config)
 
-        if response.candidates:
-            for part in response.candidates[0].content.parts:
-                if hasattr(part, 'inline_data') and part.inline_data:
-                    image_data = part.inline_data.data
-                elif hasattr(part, 'text') and part.text:
-                    text_response = part.text
-
-        if not image_data:
-            return {
-                "success": False,
-                "error": "No image data in response",
-                "text_response": text_response
-            }
-
-        # Save image
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"gemini_edited_{timestamp}.png"
-        file_path = output_path / filename
+        results: list[dict] = []
+        file_paths: list[str] = []
+        text_responses: list[str] = []
 
-        with open(file_path, "wb") as f:
-            f.write(image_data)
+        for i in range(num_images):
+            response = client.models.generate_content(
+                model=model,
+                contents=contents,
+                config=types.GenerateContentConfig(**config_kwargs),
+            )
+
+            # Extract image from response
+            image_data = None
+            text_response = None
+
+            if response.candidates:
+                for part in response.candidates[0].content.parts:
+                    # Skip thought parts
+                    if hasattr(part, "thought") and part.thought:
+                        continue
+                    if hasattr(part, "inline_data") and part.inline_data:
+                        image_data = part.inline_data.data
+                    elif hasattr(part, "text") and part.text:
+                        text_response = part.text
+
+            if not image_data:
+                results.append(
+                    {
+                        "success": False,
+                        "error": "No image data in response",
+                        "text_response": text_response,
+                    }
+                )
+                continue
+
+            filename = (
+                f"gemini_edited_{timestamp}_{i+1:02d}.png"
+                if num_images > 1
+                else f"gemini_edited_{timestamp}.png"
+            )
+            file_path = output_path / filename
+
+            with open(file_path, "wb") as f:
+                f.write(image_data)
+
+            file_paths.append(str(file_path))
+            if text_response:
+                text_responses.append(text_response)
+            results.append(
+                {
+                    "success": True,
+                    "file_path": str(file_path),
+                    "text_response": text_response,
+                }
+            )
+
+        if not file_paths:
+            return {
+                "success": False,
+                "error": "Failed to generate any edited images",
+                "model": model,
+                "results": results,
+            }
 
         return {
             "success": True,
-            "file_path": str(file_path),
-            "message": f"Edited image saved to {file_path}",
-            "text_response": text_response
+            "file_path": file_paths[0],
+            "file_paths": file_paths,
+            "message": f"Saved {len(file_paths)} edited image(s) to {output_path}",
+            "model": model,
+            "text_response": text_responses[0] if text_responses else None,
+            "results": results,
         }
 
     except Exception as e:
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        return {"success": False, "error": str(e)}
