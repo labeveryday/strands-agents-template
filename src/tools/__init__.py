@@ -32,6 +32,11 @@ from .gemini_music import (
     generate_music_weighted,
 )
 
+from .carbon_image import (
+    generate_code_image,
+    list_carbon_themes,
+)
+
 __all__ = [
     # Model selector tools
     "get_available_models",
@@ -52,5 +57,8 @@ __all__ = [
     # Gemini music tools
     "generate_music",
     "generate_music_weighted",
+    # Carbon code image tools
+    "generate_code_image",
+    "list_carbon_themes",
 ]
 

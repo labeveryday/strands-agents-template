@@ -11,12 +11,10 @@ Supports Gemini 3 Pro Preview / Gemini 3 Flash Preview for *video understanding*
 Note: This tool is intentionally separate from `gemini_video.py`, which is Veo video generation.
 """
 
-from __future__ import annotations
-
 import os
 import time
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Optional
 
 from strands import tool
 from google import genai
@@ -24,14 +22,6 @@ from google.genai import types
 
 
 _DEFAULT_INLINE_MAX_BYTES = 20 * 1024 * 1024  # 20MB (docs guidance)
-
-Gemini3Model = Literal["gemini-3-pro-preview", "gemini-3-flash-preview"]
-MediaResolutionLevel = Literal[
-    "media_resolution_low",
-    "media_resolution_medium",
-    "media_resolution_high",
-    "media_resolution_ultra_high",
-]
 
 
 def _guess_mime_type_for_video(path: Path) -> str:
@@ -58,7 +48,7 @@ def _build_video_part(
     start_offset_s: Optional[int] = None,
     end_offset_s: Optional[int] = None,
     fps: Optional[float] = None,
-    media_resolution: Optional[MediaResolutionLevel] = None,
+    media_resolution: Optional[str] = None,
 ) -> types.Part:
     video_metadata = None
     if start_offset_s is not None or end_offset_s is not None or fps is not None:
@@ -154,14 +144,14 @@ def understand_video(
     prompt: str,
     video_path: Optional[str] = None,
     youtube_url: Optional[str] = None,
-    model: Gemini3Model = "gemini-3-flash-preview",
+    model: str = "gemini-3-flash-preview",
     use_file_api: bool = True,
     max_inline_bytes: int = _DEFAULT_INLINE_MAX_BYTES,
     start_offset_seconds: Optional[int] = None,
     end_offset_seconds: Optional[int] = None,
     fps: Optional[float] = None,
-    media_resolution: Optional[MediaResolutionLevel] = None,
-    thinking_level: Optional[Literal["minimal", "low", "medium", "high"]] = None,
+    media_resolution: Optional[str] = None,
+    thinking_level: Optional[str] = None,
     max_wait_seconds: int = 300,
 ) -> dict:
     """
