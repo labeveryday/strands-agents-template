@@ -60,7 +60,6 @@ def generate_image(
     image_size: Optional[ImageSize] = None,
     use_google_search: bool = False,
     reference_images: Optional[List[str]] = None,
-    num_images: int = 1,
     output_dir: str = "output",
 ) -> dict:
     """
@@ -78,12 +77,10 @@ def generate_image(
     Returns:
         dict with keys:
             - success: bool indicating if generation succeeded
-            - file_path: path to first saved image (if successful)
-            - file_paths: list of saved image paths (if successful)
+            - file_path: path to saved image (if successful)
             - message: status message
             - text_response: any text from the model
             - error: error message (if failed)
-            - results: per-image results (paths/errors)
 
     Examples:
         # Basic generation
@@ -103,9 +100,6 @@ def generate_image(
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
         return {"success": False, "error": "GOOGLE_API_KEY environment variable not set"}
-
-    if num_images < 1 or num_images > 20:
-        return {"success": False, "error": "num_images must be between 1 and 20"}
 
     # Validate model-specific features
     if model == "gemini-2.5-flash-image":
@@ -154,78 +148,50 @@ def generate_image(
         if use_google_search and model == "gemini-3-pro-image-preview":
             config_kwargs["tools"] = [{"google_search": {}}]
 
+        response = client.models.generate_content(
+            model=model,
+            contents=contents,
+            config=types.GenerateContentConfig(**config_kwargs),
+        )
+
+        # Extract image from response
+        image_data = None
+        text_response = None
+
+        if response.candidates:
+            for part in response.candidates[0].content.parts:
+                # Skip thought parts
+                if hasattr(part, 'thought') and part.thought:
+                    continue
+                if hasattr(part, 'inline_data') and part.inline_data:
+                    image_data = part.inline_data.data
+                elif hasattr(part, 'text') and part.text:
+                    text_response = part.text
+
+        if not image_data:
+            return {
+                "success": False,
+                "error": "No image data in response",
+                "text_response": text_response
+            }
+
+        # Save image
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        results: list[dict] = []
-        file_paths: list[str] = []
-        text_responses: list[str] = []
+        filename = f"gemini_image_{timestamp}.png"
+        file_path = output_path / filename
 
-        for i in range(num_images):
-            response = client.models.generate_content(
-                model=model,
-                contents=contents,
-                config=types.GenerateContentConfig(**config_kwargs),
-            )
-
-            # Extract image from response
-            image_data = None
-            text_response = None
-
-            if response.candidates:
-                for part in response.candidates[0].content.parts:
-                    # Skip thought parts
-                    if hasattr(part, "thought") and part.thought:
-                        continue
-                    if hasattr(part, "inline_data") and part.inline_data:
-                        image_data = part.inline_data.data
-                    elif hasattr(part, "text") and part.text:
-                        text_response = part.text
-
-            if not image_data:
-                results.append(
-                    {
-                        "success": False,
-                        "error": "No image data in response",
-                        "text_response": text_response,
-                    }
-                )
-                continue
-
-            filename = f"gemini_image_{timestamp}_{i+1:02d}.png" if num_images > 1 else f"gemini_image_{timestamp}.png"
-            file_path = output_path / filename
-            with open(file_path, "wb") as f:
-                f.write(image_data)
-
-            file_paths.append(str(file_path))
-            if text_response:
-                text_responses.append(text_response)
-            results.append(
-                {
-                    "success": True,
-                    "file_path": str(file_path),
-                    "text_response": text_response,
-                }
-            )
-
-        if not file_paths:
-            # All failed
-            return {
-                "success": False,
-                "error": "Failed to generate any images",
-                "model": model,
-                "results": results,
-            }
+        with open(file_path, "wb") as f:
+            f.write(image_data)
 
         return {
             "success": True,
-            "file_path": file_paths[0],
-            "file_paths": file_paths,
-            "message": f"Saved {len(file_paths)} image(s) to {output_path}",
+            "file_path": str(file_path),
+            "message": f"Image saved to {file_path}",
             "model": model,
-            "text_response": text_responses[0] if text_responses else None,
-            "results": results,
+            "text_response": text_response
         }
 
     except Exception as e:
@@ -240,7 +206,6 @@ def edit_image(
     aspect_ratio: Optional[AspectRatio] = None,
     image_size: Optional[ImageSize] = None,
     additional_images: Optional[List[str]] = None,
-    num_images: int = 1,
     output_dir: str = "output",
 ) -> dict:
     """
@@ -264,12 +229,10 @@ def edit_image(
     Returns:
         dict with keys:
             - success: bool indicating if edit succeeded
-            - file_path: path to first saved image (if successful)
-            - file_paths: list of saved image paths (if successful)
+            - file_path: path to saved image (if successful)
             - message: status message
             - text_response: any text from the model
             - error: error message (if failed)
-            - results: per-image results (paths/errors)
 
     Examples:
         # Simple edit
@@ -288,9 +251,6 @@ def edit_image(
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
         return {"success": False, "error": "GOOGLE_API_KEY environment variable not set"}
-
-    if num_images < 1 or num_images > 20:
-        return {"success": False, "error": "num_images must be between 1 and 20"}
 
     # Validate model-specific features
     if model == "gemini-2.5-flash-image":
@@ -334,82 +294,50 @@ def edit_image(
         if image_config:
             config_kwargs["image_config"] = types.ImageConfig(**image_config)
 
+        response = client.models.generate_content(
+            model=model,
+            contents=contents,
+            config=types.GenerateContentConfig(**config_kwargs),
+        )
+
+        # Extract image from response
+        image_data = None
+        text_response = None
+
+        if response.candidates:
+            for part in response.candidates[0].content.parts:
+                # Skip thought parts
+                if hasattr(part, 'thought') and part.thought:
+                    continue
+                if hasattr(part, 'inline_data') and part.inline_data:
+                    image_data = part.inline_data.data
+                elif hasattr(part, 'text') and part.text:
+                    text_response = part.text
+
+        if not image_data:
+            return {
+                "success": False,
+                "error": "No image data in response",
+                "text_response": text_response
+            }
+
+        # Save image
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        results: list[dict] = []
-        file_paths: list[str] = []
-        text_responses: list[str] = []
+        filename = f"gemini_edited_{timestamp}.png"
+        file_path = output_path / filename
 
-        for i in range(num_images):
-            response = client.models.generate_content(
-                model=model,
-                contents=contents,
-                config=types.GenerateContentConfig(**config_kwargs),
-            )
-
-            # Extract image from response
-            image_data = None
-            text_response = None
-
-            if response.candidates:
-                for part in response.candidates[0].content.parts:
-                    # Skip thought parts
-                    if hasattr(part, "thought") and part.thought:
-                        continue
-                    if hasattr(part, "inline_data") and part.inline_data:
-                        image_data = part.inline_data.data
-                    elif hasattr(part, "text") and part.text:
-                        text_response = part.text
-
-            if not image_data:
-                results.append(
-                    {
-                        "success": False,
-                        "error": "No image data in response",
-                        "text_response": text_response,
-                    }
-                )
-                continue
-
-            filename = (
-                f"gemini_edited_{timestamp}_{i+1:02d}.png"
-                if num_images > 1
-                else f"gemini_edited_{timestamp}.png"
-            )
-            file_path = output_path / filename
-
-            with open(file_path, "wb") as f:
-                f.write(image_data)
-
-            file_paths.append(str(file_path))
-            if text_response:
-                text_responses.append(text_response)
-            results.append(
-                {
-                    "success": True,
-                    "file_path": str(file_path),
-                    "text_response": text_response,
-                }
-            )
-
-        if not file_paths:
-            return {
-                "success": False,
-                "error": "Failed to generate any edited images",
-                "model": model,
-                "results": results,
-            }
+        with open(file_path, "wb") as f:
+            f.write(image_data)
 
         return {
             "success": True,
-            "file_path": file_paths[0],
-            "file_paths": file_paths,
-            "message": f"Saved {len(file_paths)} edited image(s) to {output_path}",
+            "file_path": str(file_path),
+            "message": f"Edited image saved to {file_path}",
             "model": model,
-            "text_response": text_responses[0] if text_responses else None,
-            "results": results,
+            "text_response": text_response
         }
 
     except Exception as e:

@@ -35,6 +35,54 @@ WindowTheme = Literal["none", "sharp", "bw", "boxy"]
 ExportSize = Literal["1x", "2x", "4x"]
 
 
+def _repo_root() -> Path:
+    # src/tools/carbon_image.py -> src/tools -> src -> repo root
+    return Path(__file__).resolve().parents[2]
+
+
+def _is_within_root(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+        return True
+    except ValueError:
+        return False
+
+
+def _guess_language_from_path(path: Path) -> str:
+    # Carbon language names are generally long-form (python, javascript, etc.)
+    ext = path.suffix.lower().lstrip(".")
+    return {
+        "py": "python",
+        "js": "javascript",
+        "ts": "typescript",
+        "tsx": "typescript",
+        "jsx": "javascript",
+        "go": "go",
+        "rs": "rust",
+        "java": "java",
+        "kt": "kotlin",
+        "swift": "swift",
+        "cpp": "cpp",
+        "cc": "cpp",
+        "cxx": "cpp",
+        "c": "c",
+        "h": "cpp",
+        "hpp": "cpp",
+        "cs": "csharp",
+        "rb": "ruby",
+        "php": "php",
+        "sh": "bash",
+        "bash": "bash",
+        "zsh": "bash",
+        "sql": "sql",
+        "json": "json",
+        "yaml": "yaml",
+        "yml": "yaml",
+        "toml": "toml",
+        "md": "markdown",
+    }.get(ext, "auto")
+
+
 def _build_carbon_url(
     code: str,
     language: str = "auto",
@@ -276,3 +324,151 @@ def list_carbon_themes() -> dict:
         "recommended": recommended,
         "default": "seti",
     }
+
+
+@tool
+def generate_code_image_from_file(
+    file_path: str,
+    start_line: Optional[int] = None,
+    end_line: Optional[int] = None,
+    language: str = "auto",
+    theme: Theme = "seti",
+    background_color: str = "rgba(171,184,195,1)",
+    window_theme: WindowTheme = "none",
+    padding: int = 56,
+    line_numbers: bool = False,
+    font_family: str = "Fira Code",
+    font_size: int = 14,
+    output_dir: str = "output",
+    max_lines: int = 250,
+    max_bytes: int = 250_000,
+) -> dict:
+    """
+    Generate a Carbon code screenshot by reading code directly from a file.
+
+    This is a convenience wrapper around generate_code_image() that:
+    - Safely resolves paths within the repo
+    - Optionally selects a line range
+    - Limits output size (max_lines/max_bytes) to keep screenshots manageable
+
+    Args:
+        file_path: Path to the source file (relative to repo root or absolute).
+        start_line: 1-based start line (inclusive). Defaults to start of file.
+        end_line: 1-based end line (inclusive). Defaults to end of file.
+        language: Language for Carbon highlighting ("auto" to infer from extension).
+        theme/background_color/window_theme/padding/line_numbers/font_family/font_size/output_dir:
+            Same as generate_code_image().
+        max_lines: Max lines of code to include in the image (default: 250).
+        max_bytes: Max bytes to read from disk (default: 250KB).
+
+    Returns:
+        Same dict as generate_code_image(), plus:
+            - source_file: repo-relative path
+            - source_lines: "start-end" string for the included snippet
+    """
+    root = _repo_root()
+    requested = Path(file_path).expanduser()
+
+    # Resolve relative paths flexibly:
+    # - repo root (recommended)
+    # - current working directory (useful in scripts)
+    # - examples/ subdir fallback (common when running examples)
+    candidates: list[Path]
+    if requested.is_absolute():
+        candidates = [requested]
+    else:
+        candidates = [
+            root / requested,
+            Path.cwd() / requested,
+            root / "examples" / requested,
+        ]
+
+    full_path: Optional[Path] = None
+    for cand in candidates:
+        resolved = cand.resolve()
+        if resolved.exists():
+            full_path = resolved
+            break
+
+    if full_path is None:
+        return {
+            "success": False,
+            "error": (
+                f"File not found: {file_path}\n"
+                "Tried: "
+                + ", ".join(str(c) for c in candidates)
+                + "\nTip: use a repo-root path like 'examples/code_location/sample.py'."
+            ),
+        }
+    if not full_path.is_file():
+        return {"success": False, "error": f"Not a file: {file_path}"}
+    if not _is_within_root(full_path, root):
+        return {
+            "success": False,
+            "error": "Path is outside the repository root; this tool only reads files within the project.",
+        }
+
+    s = 1 if start_line is None else max(1, int(start_line))
+    e_req = None if end_line is None else max(1, int(end_line))
+    if e_req is not None and e_req < s:
+        return {"success": False, "error": f"end_line ({e_req}) must be >= start_line ({s})."}
+
+    # Stream read up to limits
+    collected: list[tuple[int, str]] = []
+    total_lines = 0
+    approx_bytes = 0
+    hit_limit = False
+
+    try:
+        with full_path.open("r", encoding="utf-8", errors="replace") as f:
+            for i, line in enumerate(f, start=1):
+                total_lines = i
+                if i < s:
+                    continue
+                if e_req is not None and i > e_req:
+                    break
+
+                line = line.rstrip("\n")
+                collected.append((i, line))
+
+                approx_bytes += len(line.encode("utf-8", errors="replace")) + 1
+                if len(collected) >= max_lines or approx_bytes >= max_bytes:
+                    hit_limit = True
+                    break
+    except Exception as ex:
+        return {"success": False, "error": f"Failed reading file: {type(ex).__name__}: {ex}"}
+
+    if total_lines == 0:
+        return {"success": False, "error": f"File is empty: {str(full_path.relative_to(root))}"}
+    if not collected:
+        return {
+            "success": False,
+            "error": f"No lines collected. Check start_line/end_line for {str(full_path.relative_to(root))}.",
+        }
+
+    s_out = collected[0][0]
+    e_out = collected[-1][0]
+    code = "\n".join(line for _, line in collected)
+
+    lang = language if language != "auto" else _guess_language_from_path(full_path)
+
+    result = generate_code_image(
+        code=code,
+        language=lang,
+        theme=theme,
+        background_color=background_color,
+        window_theme=window_theme,
+        padding=padding,
+        line_numbers=line_numbers,
+        font_family=font_family,
+        font_size=font_size,
+        output_dir=output_dir,
+    )
+
+    # Add source metadata
+    result["source_file"] = str(full_path.relative_to(root))
+    result["source_lines"] = f"{s_out}-{e_out}"
+    if hit_limit:
+        result["note"] = "Input snippet was truncated due to max_lines/max_bytes. Use start_line/end_line to narrow."
+
+    return result

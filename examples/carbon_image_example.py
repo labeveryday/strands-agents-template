@@ -24,7 +24,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from strands import Agent
-from src.tools.carbon_image import generate_code_image, list_carbon_themes
+from src.tools.carbon_image import (
+    generate_code_image,
+    generate_code_image_from_file,
+    list_carbon_themes,
+)
 from src.models import anthropic_model
 from src.config import CARBON_IMAGE_PROMPT
 from src.hub import (
@@ -226,7 +230,7 @@ def main():
     if args.interactive:
         # Interactive agent mode
         print(f"\n{AGENT_NAME}")
-        print("Available tools: generate_code_image, list_carbon_themes")
+        print("Available tools: generate_code_image, generate_code_image_from_file, list_carbon_themes")
         print("Type 'exit' to quit\n")
 
         # Create session manager for interactive mode
@@ -237,7 +241,7 @@ def main():
         model = anthropic_model()
         agent = Agent(
             model=model,
-            tools=[generate_code_image, list_carbon_themes],
+            tools=[generate_code_image, generate_code_image_from_file, list_carbon_themes],
             session_manager=session_manager,
             system_prompt=CARBON_IMAGE_PROMPT.format(output_dir=args.output_dir),
         )

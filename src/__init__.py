@@ -1,5 +1,10 @@
-"""YouTube RAG Agent module."""
+"""Strands Agents template package.
 
-from .models import anthropic_model, openai_model, ollama_model
+Keep this module lightweight: avoid importing optional dependencies or
+performing side effects at import time. Import from submodules instead:
 
-__all__ = ["anthropic_model", "openai_model", "ollama_model"]
+- `from models import anthropic_model` (recommended in this template)
+- or `from src.models import anthropic_model` if you prefer fully-qualified imports
+"""
+
+__all__: list[str] = []
