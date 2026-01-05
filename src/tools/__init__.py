@@ -31,6 +31,13 @@ from .carbon_image import (
     list_carbon_themes,
 )
 
+from .ffmpeg_video import (
+    cut_video,
+    concat_videos,
+    get_video_info,
+    extract_audio,
+)
+
 __all__ = [
     # Model selector tools
     "get_available_models",
@@ -51,5 +58,10 @@ __all__ = [
     # Gemini music tools
     "generate_music",
     "generate_music_weighted",
+    # FFmpeg video tools
+    "cut_video",
+    "concat_videos",
+    "get_video_info",
+    "extract_audio",
 ]
 

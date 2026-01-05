@@ -1,5 +1,10 @@
+"""
+This is a sample script that creates a daily dev ops brief.
+"""
+
 from strands import Agent
 from strands.models.bedrock import BedrockModel
+from strands_tools import shell, editor, current_time, http_request
 
 
 model = BedrockModel(
@@ -18,5 +23,12 @@ model = BedrockModel(
     }
 )
 
-agent = Agent(model=model)
-agent("What is an AI agent?")
+agent = Agent(model=model, tools=[shell, editor, current_time, http_request])
+result = agent("""Create a “Daily Dev Ops Brief” for me. 
+Use current_time() for the timestamp, 
+use http_request to fetch https://www.githubstatus.com/api/v2/status.json and 
+summarize the current GitHub status in 1–2 lines, 
+use shell to run git status --porcelain && git log -5 --oneline, 
+then use editor to write a markdown file OPS_BRIEF.md with sections: 
+Timestamp, GitHub Status, Repo Status, Recent Commits
+""")
